@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
-import { dispose, loadMapData, watchMapJson } from "./mapData";
+import { CallerCountProvider } from "./callerCount";
+import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
 import { createMcpServer } from "./mcpServer";
 
@@ -52,6 +53,28 @@ export async function activate(
 
     outputChannel.appendLine("File decoration provider registered.");
   }
+
+  // Set up caller count gutter decorations
+  const callerCountProvider = new CallerCountProvider();
+  context.subscriptions.push({ dispose: () => callerCountProvider.dispose() });
+
+  if (mapData) {
+    callerCountProvider.updateMapData(mapData);
+  }
+
+  // Re-apply decorations when map data changes
+  const mapDataSub = onMapDataChanged((data) => {
+    callerCountProvider.updateMapData(data);
+  });
+  context.subscriptions.push(mapDataSub);
+
+  // Re-apply decorations when active editor changes
+  const editorSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (editor) {
+      callerCountProvider.updateDecorations(editor);
+    }
+  });
+  context.subscriptions.push(editorSub);
 
   outputChannel.appendLine("No Longer Vibe extension activated.");
 }

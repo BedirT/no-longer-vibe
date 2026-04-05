@@ -289,6 +289,23 @@ export function __resetDecorationTracking(): void {
   decorationApplications = [];
 }
 
+/** Active text editor mock. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mockActiveTextEditor: any = undefined;
+
+/** Sets the active text editor for tests. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function __setActiveEditor(editor: any): void {
+  mockActiveTextEditor = editor;
+}
+
+/** Clears caller-count-specific test state (active editor + decoration tracking). */
+export function __clearDecorationState(): void {
+  decorationTypes = [];
+  decorationApplications = [];
+  mockActiveTextEditor = undefined;
+}
+
 /** Mock editor tracking for test assertions. */
 interface MockEditorRecord {
   selection: Selection | undefined;
@@ -392,6 +409,9 @@ export function __createMockEditor(filePath: string): {
 }
 
 export const window = {
+  get activeTextEditor() {
+    return mockActiveTextEditor;
+  },
   createOutputChannel: vi.fn((name: string): MockOutputChannel => {
     return new MockOutputChannel(name);
   }),
@@ -407,6 +427,11 @@ export const window = {
       return decType;
     },
   ),
+  onDidChangeActiveTextEditor: vi.fn((_listener: () => void) => {
+    return new Disposable(() => {
+      // noop
+    });
+  }),
   get visibleTextEditors() {
     return mockVisibleTextEditors;
   },
