@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -25,7 +26,7 @@ EXPECTED_COMMANDS = [
 REQUIRED_FRONTMATTER_FIELDS = {"name", "description", "triggers"}
 
 
-def _parse_frontmatter(skill_path: Path) -> dict:
+def _parse_frontmatter(skill_path: Path) -> dict[str, Any]:
     """Parse YAML frontmatter from a SKILL.md file."""
     text = skill_path.read_text()
     match = re.match(r"^---\n(.+?)\n---", text, re.DOTALL)
@@ -148,6 +149,14 @@ class TestProjectLocalRegistration:
             skill_file = skill_dir / "SKILL.md"
             assert skill_file.exists(), (
                 f".claude/skills/{cmd}/SKILL.md not found"
+            )
+
+    def test_claude_skills_entries_are_symlinks(self) -> None:
+        claude_skills = REPO_ROOT / ".claude" / "skills"
+        for cmd in EXPECTED_COMMANDS:
+            skill_dir = claude_skills / cmd
+            assert skill_dir.is_symlink(), (
+                f".claude/skills/{cmd} should be a symlink, not a copy"
             )
 
 

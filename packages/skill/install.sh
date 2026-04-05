@@ -7,6 +7,8 @@
 
 set -euo pipefail
 
+command -v python3 >/dev/null 2>&1 || { echo "Error: python3 required" >&2; exit 1; }
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 COMMANDS=(read-index read-next read-status read-flagged read-refresh)
 
@@ -45,7 +47,7 @@ for cmd in "${COMMANDS[@]}"; do
     fi
 
     # Use relative symlink so it works across clones
-    rel_src="$(python3 -c "import os.path; print(os.path.relpath('$src', '$(dirname "$dest")'))")"
+    rel_src="$(python3 -c "import os.path,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$src" "$(dirname "$dest")")"
     ln -s "$rel_src" "$dest"
     echo "  Linked: $cmd -> $rel_src"
 done

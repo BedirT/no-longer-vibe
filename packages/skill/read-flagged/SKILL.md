@@ -32,6 +32,7 @@ noted when they originally flagged each file.
 5. The user reviews and either:
    - `confirmed` -> update status to `confirmed`, clear the flag
    - `flag <new_reason>` -> keep flagged with updated note
+   - `skim` / `skimmed` -> mark as `skimmed`
    - Ask questions -> answer and wait
 6. Update `progress.json` atomically after each change.
 7. Continue to the next flagged file until all are resolved.
