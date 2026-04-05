@@ -146,6 +146,21 @@ class TestGitignoreRespect:
         files = walk_tree(project, extensions={".py"})
         assert len(files) > 0
 
+    def test_nested_gitignore_does_not_leak_to_siblings(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """A .gitignore in one directory should not affect sibling directories."""
+        (tmp_path / "a").mkdir()
+        (tmp_path / "a" / ".gitignore").write_text("secret.py\n")
+        (tmp_path / "a" / "secret.py").write_text("")
+        (tmp_path / "b").mkdir()
+        (tmp_path / "b" / "secret.py").write_text("")
+
+        files = walk_tree(tmp_path, extensions={".py"})
+        paths = {f.path for f in files}
+        assert "a/secret.py" not in paths
+        assert "b/secret.py" in paths
+
 
 class TestDirectorySkipping:
     """Tests for skipping common non-source directories."""
@@ -238,3 +253,26 @@ class TestEdgeCases:
         paths = {f.path for f in files}
         assert "image.png" not in paths
         assert "app.py" in paths
+
+    def test_raises_on_nonexistent_root(self, tmp_path: pathlib.Path) -> None:
+        """Raises NotADirectoryError for nonexistent path."""
+        with pytest.raises(NotADirectoryError):
+            walk_tree(tmp_path / "nonexistent", extensions={".py"})
+
+    def test_raises_on_file_root(self, tmp_path: pathlib.Path) -> None:
+        """Raises NotADirectoryError when root is a file."""
+        f = tmp_path / "file.py"
+        f.write_text("")
+        with pytest.raises(NotADirectoryError):
+            walk_tree(f, extensions={".py"})
+
+    def test_multiple_extensions(self, tmp_path: pathlib.Path) -> None:
+        """Multiple extensions collect all matching file types."""
+        (tmp_path / "app.py").write_text("")
+        (tmp_path / "style.css").write_text("")
+        (tmp_path / "readme.md").write_text("")
+        files = walk_tree(tmp_path, extensions={".py", ".css"})
+        paths = {f.path for f in files}
+        assert "app.py" in paths
+        assert "style.css" in paths
+        assert "readme.md" not in paths

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,7 +47,12 @@ def _load_gitignore(directory: Path) -> pathspec.PathSpec | None:
 
 
 def _is_test_file(rel_path: str) -> bool:
-    """Determine if a file is a test file based on naming conventions."""
+    """Determine if a file is a test file based on naming conventions.
+
+    Currently Python-specific (conftest.py, test_*, *_test). When the
+    plugin architecture (BED-62) is implemented, this should delegate
+    to language-specific detectors.
+    """
     parts = rel_path.split("/")
     name = parts[-1]
 
@@ -65,18 +71,24 @@ def _is_test_file(rel_path: str) -> bool:
 
 def walk_tree(
     root: Path,
-    extensions: set[str],
+    extensions: AbstractSet[str],
 ) -> list[SourceFile]:
     """Walk a file tree collecting source files.
 
     Args:
-        root: Root directory to walk.
+        root: Root directory to walk. Must be an existing directory.
         extensions: Set of file extensions to include (e.g. {".py"}).
 
     Returns:
         Sorted list of SourceFile objects with relative paths.
+
+    Raises:
+        NotADirectoryError: If root does not exist or is not a directory.
     """
     root = root.resolve()
+    if not root.is_dir():
+        msg = f"Root path is not a directory: {root}"
+        raise NotADirectoryError(msg)
     # Collect gitignore specs keyed by directory (relative to root)
     gitignore_specs: list[tuple[str, pathspec.PathSpec]] = []
 
@@ -94,7 +106,11 @@ def _is_ignored(
     rel_path: str,
     gitignore_specs: list[tuple[str, pathspec.PathSpec]],
 ) -> bool:
-    """Check if a relative path matches any accumulated gitignore spec."""
+    """Check if a relative path matches any accumulated gitignore spec.
+
+    Note: negation patterns (!) in nested .gitignore files do not override
+    patterns from parent .gitignore files. This differs from real git behavior.
+    """
     for prefix, spec in gitignore_specs:
         if prefix:
             # Nested gitignore — match relative to its directory
@@ -111,7 +127,7 @@ def _is_ignored(
 def _walk_dir(
     current: Path,
     root: Path,
-    extensions: set[str],
+    extensions: AbstractSet[str],
     gitignore_specs: list[tuple[str, pathspec.PathSpec]],
     results: list[SourceFile],
 ) -> None:
