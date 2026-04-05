@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": null,
+  "current_issue": "BED-69",
   "features": [
     {
       "issue": "BED-72",
@@ -30,6 +30,12 @@
       "title": "progress.json management — create, read, update, stats",
       "status": "pr-open",
       "branch": "feat/bed-73-progress-json"
+    },
+    {
+      "issue": "BED-69",
+      "title": "Content hashing — SHA-256 for staleness detection",
+      "status": "pr-open",
+      "branch": "feat/bed-69-content-hashing"
     }
   ],
   "blockers": [],
