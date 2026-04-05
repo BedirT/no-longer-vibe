@@ -60,10 +60,11 @@
     {
       "issue": "BED-70",
       "title": "map.json output — generate .codebase-guide/map.json per schema",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/15",
       "branch": "feat/bed-70-map-json-output"
     }
   ],
   "blockers": [],
-  "next_action": "BED-70 PR needs to be merged."
+  "next_action": "BED-70 complete. Pick next unblocked issue."
 }
