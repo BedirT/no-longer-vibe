@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "repo_root": "/mock/workspace",
+  "generated_at": "2026-04-04T10:00:00Z",
+  "content_hashes": {
+    "src/config.ts": "a3f2b8c1",
+    "src/models/user.ts": "d4e5f6a7"
+  },
+  "total_files": 2,
+  "layers": {
+    "foundation": {
+      "description": "No or minimal internal dependencies",
+      "files": ["src/config.ts"]
+    },
+    "core": {
+      "description": "Depends only on foundation",
+      "files": ["src/models/user.ts"]
+    },
+    "features": {
+      "description": "Business logic, depends on core",
+      "files": []
+    },
+    "integration": {
+      "description": "Composes features, middleware, API routes",
+      "files": []
+    },
+    "entry": {
+      "description": "App entry points, page-level composition",
+      "files": []
+    }
+  },
+  "reading_order": [
+    {
+      "index": 0,
+      "path": "src/config.ts",
+      "layer": "foundation",
+      "reason": "No dependencies. Defines core configuration.",
+      "complexity": "low",
+      "line_count": 45,
+      "imports": [],
+      "imported_by": ["src/models/user.ts"],
+      "exports": ["AppConfig", "getConfig"]
+    },
+    {
+      "index": 1,
+      "path": "src/models/user.ts",
+      "layer": "core",
+      "reason": "Depends on config (already read).",
+      "complexity": "medium",
+      "line_count": 120,
+      "imports": ["src/config.ts"],
+      "imported_by": [],
+      "exports": ["User", "createUser"]
+    }
+  ],
+  "dependency_graph": {
+    "src/config.ts": {
+      "imports": [],
+      "imported_by": ["src/models/user.ts"]
+    },
+    "src/models/user.ts": {
+      "imports": ["src/config.ts"],
+      "imported_by": []
+    }
+  }
+}

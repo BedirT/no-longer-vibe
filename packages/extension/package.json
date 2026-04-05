@@ -1,0 +1,37 @@
+{
+  "name": "no-longer-vibe",
+  "displayName": "No Longer Vibe",
+  "description": "Deterministic codebase comprehension tool — read your AI-generated codebase in smart order with progress tracking.",
+  "version": "0.1.0",
+  "publisher": "no-longer-vibe",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.codebase-guide/map.json"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "lint": "eslint src/ test/ --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepackage": "npm run build",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}
