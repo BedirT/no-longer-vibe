@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-79",
+  "current_issue": "BED-78",
   "features": [
     {
       "issue": "BED-72",
@@ -56,8 +56,15 @@
       "title": "Session priming — compressed context from previous summaries",
       "status": "in-progress",
       "branch": "feat/bed-79-session-priming"
+    },
+    {
+      "issue": "BED-78",
+      "title": "/read-refresh command — incremental re-parse with transitive invalidation",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/18",
+      "branch": "feat/bed-78-read-refresh"
     }
   ],
   "blockers": [],
-  "next_action": "BED-79 PR needs to be created and merged."
+  "next_action": "BED-78 completed. Pick next unblocked issue."
 }
