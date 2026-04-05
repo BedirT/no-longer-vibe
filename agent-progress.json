@@ -16,6 +16,7 @@
       "issue": "BED-61",
       "title": "File tree walker — .gitignore-aware source file collection",
       "status": "pr-open",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/3",
       "branch": "feat/bed-61-file-tree-walker"
     }
   ],
