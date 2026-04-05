@@ -170,6 +170,28 @@ export function __getLastWatcher(): MockFileSystemWatcher | undefined {
   return lastCreatedWatcher;
 }
 
+export class ThemeColor {
+  readonly id: string;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+}
+
+/** Mock FileDecoration matching the vscode.FileDecoration interface. */
+export class FileDecoration {
+  badge?: string;
+  tooltip?: string;
+  color?: ThemeColor;
+  propagate?: boolean;
+
+  constructor(badge?: string, tooltip?: string, color?: ThemeColor) {
+    this.badge = badge;
+    this.tooltip = tooltip;
+    this.color = color;
+  }
+}
+
 export class RelativePattern {
   constructor(
     public base: { uri: Uri } | Uri | string,
@@ -291,6 +313,11 @@ export const window = {
   createOutputChannel: vi.fn((name: string): MockOutputChannel => {
     return new MockOutputChannel(name);
   }),
+  registerFileDecorationProvider: vi.fn(
+    (_provider: unknown): Disposable => {
+      return new Disposable(() => {});
+    },
+  ),
   showTextDocument: vi.fn(async () => {
     if (mockShowTextDocumentShouldThrow) {
       throw new Error("Failed to show text document");
