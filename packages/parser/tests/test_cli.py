@@ -12,13 +12,24 @@ from nlv.cli import main
 class TestCLIEntryPoint:
     """Tests for `python -m nlv` and the main() function."""
 
-    def test_main_with_path_prints_not_implemented(
+    def test_main_with_path_runs_index(
         self, capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path,
     ) -> None:
-        """Given a valid path argument, main() prints 'not yet implemented.'"""
+        """Given a valid path argument, main() runs the index pipeline."""
         main([str(tmp_path)])
         captured = capsys.readouterr()
-        assert captured.out.strip() == "not yet implemented."
+        # Empty dir produces "0 files" summary
+        assert "0 files" in captured.out
+
+    def test_main_with_python_files(
+        self, capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path,
+    ) -> None:
+        """Given a directory with Python files, main() produces a summary."""
+        (tmp_path / "main.py").write_text("x = 1\n")
+        main([str(tmp_path)])
+        captured = capsys.readouterr()
+        assert "Indexed" in captured.out
+        assert "/read-next" in captured.out
 
     def test_main_with_no_args_exits_with_error(self) -> None:
         """With no arguments, main() exits with a non-zero code."""
@@ -32,7 +43,7 @@ class TestCLIEntryPoint:
             main(["/nonexistent/path"])
         assert exc_info.value.code != 0
 
-    def test_module_invocation_prints_not_implemented(
+    def test_module_invocation_runs_index(
         self, tmp_path: pathlib.Path,
     ) -> None:
         """`python -m nlv <path>` works as a module entry point."""
@@ -43,7 +54,8 @@ class TestCLIEntryPoint:
             check=False,
         )
         assert result.returncode == 0
-        assert result.stdout.strip() == "not yet implemented."
+        # Empty dir -> "0 files" message
+        assert "0 files" in result.stdout
 
     def test_module_invocation_no_args_fails(self) -> None:
         """`python -m nlv` with no args exits non-zero."""
@@ -71,4 +83,4 @@ class TestCLIEntryPoint:
             check=False,
         )
         assert result.returncode == 0
-        assert result.stdout.strip() == "not yet implemented."
+        assert "0 files" in result.stdout

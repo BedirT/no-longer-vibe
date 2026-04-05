@@ -6,6 +6,8 @@ import logging
 import sys
 from pathlib import Path
 
+from nlv.index import run_index
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,4 +30,9 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(1)
 
     logger.debug("Target path: %s", path)
-    sys.stdout.write("not yet implemented.\n")
+    try:
+        result = run_index(path)
+    except NotADirectoryError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+    sys.stdout.write(result.summary + "\n")
