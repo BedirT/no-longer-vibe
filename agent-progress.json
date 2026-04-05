@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-63",
+  "current_issue": "BED-64",
   "features": [
     {
       "issue": "BED-72",
@@ -41,10 +41,17 @@
     {
       "issue": "BED-63",
       "title": "Python language plugin — ast module + import resolution",
-      "status": "in-progress",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/8",
       "branch": "feat/bed-63-python-language-plugin"
+    },
+    {
+      "issue": "BED-64",
+      "title": "Dependency graph builder — directed graph from parsed imports",
+      "status": "in-progress",
+      "branch": "feat/bed-64-dependency-graph"
     }
   ],
   "blockers": [],
-  "next_action": "BED-63 PR needs to be created and merged."
+  "next_action": "BED-64 PR needs to be created and merged."
 }
