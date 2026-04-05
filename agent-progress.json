@@ -1,9 +1,16 @@
 {
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
-  "last_session": null,
+  "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "features": [],
+  "features": [
+    {
+      "issue": "BED-60",
+      "title": "Project scaffolding",
+      "status": "PR open",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/1"
+    }
+  ],
   "blockers": [],
-  "next_action": "Start with BED-60 (project scaffolding) — no blockers"
+  "next_action": "BED-61 (file tree walker) or BED-62 (language plugin architecture) — both unblocked once BED-60 merges"
 }
