@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-70",
+  "current_issue": "BED-74",
   "features": [
     {
       "issue": "BED-72",
@@ -60,10 +60,18 @@
     {
       "issue": "BED-70",
       "title": "map.json output — generate .codebase-guide/map.json per schema",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/15",
       "branch": "feat/bed-70-map-json-output"
+    },
+    {
+      "issue": "BED-74",
+      "title": "/read-index command — run parser, display summary",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/19",
+      "branch": "feat/bed-74-read-index"
     }
   ],
   "blockers": [],
-  "next_action": "BED-70 PR needs to be merged."
+  "next_action": "BED-74 is done. Pick next unblocked issue."
 }
