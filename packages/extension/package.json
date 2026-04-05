@@ -15,6 +15,46 @@
     "workspaceContains:.codebase-guide/map.json"
   ],
   "main": "./dist/extension.js",
+  "contributes": {
+    "colors": [
+      {
+        "id": "noLongerVibe.confirmed",
+        "description": "Color for files that have been read and understood",
+        "defaults": {
+          "light": "#2e7d32",
+          "dark": "#66bb6a",
+          "highContrast": "#66bb6a"
+        }
+      },
+      {
+        "id": "noLongerVibe.flagged",
+        "description": "Color for files flagged for a second pass",
+        "defaults": {
+          "light": "#e65100",
+          "dark": "#ffa726",
+          "highContrast": "#ffa726"
+        }
+      },
+      {
+        "id": "noLongerVibe.current",
+        "description": "Color for the file currently being read",
+        "defaults": {
+          "light": "#1565c0",
+          "dark": "#42a5f5",
+          "highContrast": "#42a5f5"
+        }
+      },
+      {
+        "id": "noLongerVibe.skimmed",
+        "description": "Color for files that were skimmed and need deeper review",
+        "defaults": {
+          "light": "#7e57c2",
+          "dark": "#b39ddb",
+          "highContrast": "#b39ddb"
+        }
+      }
+    ]
+  },
   "scripts": {
     "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
     "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
