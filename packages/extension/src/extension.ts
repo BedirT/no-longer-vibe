@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { BlastRadiusProvider } from "./blastRadius";
 import { CallerCountProvider } from "./callerCount";
 import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
@@ -88,12 +89,31 @@ export async function activate(
     );
     context.subscriptions.push(decorationProvider);
 
+    // Register blast radius provider for explorer decorations
+    const blastRadiusProvider = new BlastRadiusProvider(workspaceRoot);
+    context.subscriptions.push(
+      vscode.window.registerFileDecorationProvider(blastRadiusProvider),
+    );
+    context.subscriptions.push(blastRadiusProvider);
+
+    if (mapData) {
+      blastRadiusProvider.updateMapData(mapData);
+    }
+
     // Subscribe to MCP tool events for decoration and CodeLens updates
     const { toolEvents } = createMcpServer();
     const mcpDisposables = decorationProvider.subscribeMcpEvents(
       toolEvents.event,
     );
     for (const d of mcpDisposables) {
+      context.subscriptions.push(d);
+    }
+
+    // Subscribe blast radius provider to MCP events
+    const blastRadiusMcpDisposables = blastRadiusProvider.subscribeMcpEvents(
+      toolEvents.event,
+    );
+    for (const d of blastRadiusMcpDisposables) {
       context.subscriptions.push(d);
     }
 
@@ -130,13 +150,15 @@ export async function activate(
       context.subscriptions.push(d);
     }
 
-    // Refresh progress tree when map data changes
+    // Refresh progress tree and blast radius when map data changes
     const progressTreeMapSub = onMapDataChanged((data) => {
       progressTree.updateMapData(data);
+      blastRadiusProvider.updateMapData(data);
     });
     context.subscriptions.push(progressTreeMapSub);
 
     outputChannel.appendLine("File decoration provider registered.");
+    outputChannel.appendLine("Blast radius provider registered.");
     outputChannel.appendLine("Progress tree view registered.");
   }
 
