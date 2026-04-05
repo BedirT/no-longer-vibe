@@ -105,6 +105,19 @@ describe("MCP bridge integration", () => {
       expect(receivedEvents[0].tool).toBe("clear_blast_radius");
     });
 
+    it("open_file forwards to extension", async () => {
+      const mcpServer = createStandaloneMcpServer(tmpDir, client);
+      const result = await callTool(mcpServer, "open_file", {
+        path: "src/main.ts",
+        line: 42,
+      });
+
+      expect(result.content[0].text).toContain("[via extension]");
+      expect(receivedEvents).toHaveLength(1);
+      expect(receivedEvents[0].tool).toBe("open_file");
+      expect(receivedEvents[0].params.path).toBe("src/main.ts");
+    });
+
     it("clear_all forwards to extension", async () => {
       const mcpServer = createStandaloneMcpServer(tmpDir, client);
       const result = await callTool(mcpServer, "clear_all", {});

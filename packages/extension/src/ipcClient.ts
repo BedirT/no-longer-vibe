@@ -113,6 +113,12 @@ export class IpcBridgeClient {
         timer,
       });
 
+      if (this.socket!.destroyed) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        resolve(undefined);
+        return;
+      }
       this.socket!.write(encodeMessage(request));
     });
   }

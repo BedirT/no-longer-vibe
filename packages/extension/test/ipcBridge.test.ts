@@ -226,7 +226,13 @@ describe("IPC Bridge", () => {
       const client = new IpcBridgeClient(socketPath);
       await client.connect();
 
-      const result = await client.callTool("bad_tool", {});
+      // Use an allowed tool name so the request reaches the throwing handler
+      const result = await client.callTool("highlight_range", {
+        file: "a.ts",
+        startLine: 1,
+        endLine: 2,
+        style: "focus",
+      });
       expect(result).toBeUndefined();
 
       client.disconnect();
