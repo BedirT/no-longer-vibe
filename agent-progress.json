@@ -1,16 +1,29 @@
 {
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
-  "last_session": "2026-04-05T08:00:00Z",
+  "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
   "current_issue": null,
   "features": [
     {
       "issue": "BED-72",
       "title": "Skill scaffold — definition file, metadata, command registration",
-      "status": "done",
+      "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/2",
       "branch": "feat/bed-72-skill-scaffold"
+    },
+    {
+      "issue": "BED-61",
+      "title": "File tree walker — .gitignore-aware source file collection",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/3",
+      "branch": "feat/bed-61-file-tree-walker"
+    },
+    {
+      "issue": "BED-62",
+      "title": "Language plugin architecture — interface for multi-language AST parsing",
+      "status": "pr-open",
+      "branch": "feat/bed-62-language-plugin-architecture"
     },
     {
       "issue": "BED-73",
@@ -20,5 +33,5 @@
     }
   ],
   "blockers": [],
-  "next_action": "BED-61 and BED-62 are In Progress (another agent). Once BED-62 completes, BED-63 (Python language plugin) is unblocked. BED-73 unblocks BED-75, BED-76, BED-82."
+  "next_action": "BED-63 (Python language plugin) is next — blocked by BED-62. BED-73 unblocks BED-75, BED-76, BED-82."
 }
