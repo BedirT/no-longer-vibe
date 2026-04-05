@@ -84,7 +84,7 @@ install_skill() {
     CLAUDE_DIR="$HOME/.claude"
     SKILL_DIR="$CLAUDE_DIR/skills"
     SKILL_SRC="$SCRIPT_DIR/packages/skill"
-    COMMANDS=(read-index read-next read-status read-flagged read-refresh)
+    COMMANDS=(read-index read-next read-overview read-status read-flagged read-refresh)
 
     if [[ ! -d "$CLAUDE_DIR" ]]; then
         print_skip "Claude Code not found (~/.claude/ does not exist) — skipping skills"
