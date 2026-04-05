@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from nlv.analysis import compute_complexity, detect_entry_point
+from nlv.config import ReadingConfig, load_config
 from nlv.graph import DependencyGraph, build_graph
 from nlv.hashing import compute_content_hashes
 from nlv.layers import Layer, LayerClassification, classify_layers
@@ -79,6 +80,10 @@ def run_index(root: Path) -> IndexResult:
     """
     root = root.resolve()
 
+    # Load reading config from .codebase-guide/ if present
+    guide_dir = root / _GUIDE_DIR_NAME
+    config = load_config(guide_dir)
+
     # Set up plugin registry
     registry = _setup_registry()
     extensions = registry.get_supported_extensions()
@@ -106,6 +111,7 @@ def run_index(root: Path) -> IndexResult:
     classification = classify_layers(
         graph=graph,
         entry_points=entry_points,
+        config=config,
     )
 
     # Compute reading order with complexity
@@ -114,6 +120,7 @@ def run_index(root: Path) -> IndexResult:
         graph=graph,
         classification=classification,
         parse_results=parse_results,
+        config=config,
     )
 
     # Compute content hashes
@@ -231,12 +238,14 @@ def _compute_order_with_complexity(
     graph: DependencyGraph,
     classification: LayerClassification,
     parse_results: dict[str, ParseResult],
+    config: ReadingConfig,
 ) -> tuple[ReadingOrderEntry, ...]:
     """Compute reading order, then enrich with complexity data."""
     base_order = compute_reading_order(
         graph=graph,
         classification=classification,
         parse_results=parse_results,
+        config=config,
     )
 
     enriched: list[ReadingOrderEntry] = []
