@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-64",
+  "current_issue": "BED-79",
   "features": [
     {
       "issue": "BED-72",
@@ -50,8 +50,14 @@
       "title": "Dependency graph builder — directed graph from parsed imports",
       "status": "in-progress",
       "branch": "feat/bed-64-dependency-graph"
+    },
+    {
+      "issue": "BED-79",
+      "title": "Session priming — compressed context from previous summaries",
+      "status": "in-progress",
+      "branch": "feat/bed-79-session-priming"
     }
   ],
   "blockers": [],
-  "next_action": "BED-64 PR needs to be created and merged."
+  "next_action": "BED-79 PR needs to be created and merged."
 }
