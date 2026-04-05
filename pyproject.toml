@@ -35,3 +35,6 @@ typeCheckingMode = "strict"
 [tool.ruff]
 src = ["packages/parser/src"]
 target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "T201"]
