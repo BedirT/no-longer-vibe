@@ -127,7 +127,13 @@ install_skill() {
 install_extension() {
     print_header "VS Code Extension"
 
-    if ! command -v code >/dev/null 2>&1; then
+    # Detect VS Code CLI: prefer `code`, fall back to `code-insiders`
+    local vscode_cmd=""
+    if command -v code >/dev/null 2>&1; then
+        vscode_cmd="code"
+    elif command -v code-insiders >/dev/null 2>&1; then
+        vscode_cmd="code-insiders"
+    else
         print_skip "VS Code not found — skip extension install (optional)"
         return 0
     fi
@@ -166,7 +172,7 @@ install_extension() {
     fi
 
     echo "  Installing extension in VS Code..."
-    if ! code --install-extension "$vsix_file" --force 2>&1; then
+    if ! "$vscode_cmd" --install-extension "$vsix_file" --force 2>&1; then
         print_error "VS Code extension install failed"
         return 1
     fi

@@ -53,8 +53,15 @@ fi
 
 print_header "VS Code Extension"
 
+vscode_cmd=""
 if command -v code >/dev/null 2>&1; then
-    if code --uninstall-extension no-longer-vibe.no-longer-vibe 2>&1; then
+    vscode_cmd="code"
+elif command -v code-insiders >/dev/null 2>&1; then
+    vscode_cmd="code-insiders"
+fi
+
+if [[ -n "$vscode_cmd" ]]; then
+    if "$vscode_cmd" --uninstall-extension no-longer-vibe.no-longer-vibe 2>&1; then
         print_success "VS Code extension removed"
     else
         print_skip "VS Code extension was not installed"
