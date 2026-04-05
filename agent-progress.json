@@ -48,10 +48,11 @@
     {
       "issue": "BED-64",
       "title": "Dependency graph builder — directed graph from parsed imports",
-      "status": "in-progress",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/10",
       "branch": "feat/bed-64-dependency-graph"
     }
   ],
   "blockers": [],
-  "next_action": "BED-64 PR needs to be created and merged."
+  "next_action": "BED-64 complete. Next unblocked issue in Phase 1."
 }
