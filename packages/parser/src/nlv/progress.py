@@ -202,6 +202,18 @@ class ProgressManager:
             )
         return matches
 
+    def save(self) -> None:
+        """Persist current in-memory progress data to disk.
+
+        Delegates to the internal atomic-write implementation.
+        Typically called after bulk modifications that bypass
+        ``update_file`` (e.g. during a refresh operation).
+
+        Raises:
+            RuntimeError: If no data has been loaded or created.
+        """
+        self._save()
+
     def _get_data(self) -> dict[str, Any]:
         """Return loaded data, auto-loading from disk if needed.
 
