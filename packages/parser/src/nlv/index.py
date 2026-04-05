@@ -34,6 +34,7 @@ from nlv.layers import Layer, LayerClassification, classify_layers
 from nlv.output import write_map_json
 from nlv.plugins import ParseResult, PluginRegistry
 from nlv.plugins.python import PythonPlugin
+from nlv.plugins.typescript import TypeScriptPlugin
 from nlv.progress import ProgressManager
 from nlv.reading_order import (
     ReadingOrderEntry,
@@ -156,6 +157,7 @@ def _setup_registry() -> PluginRegistry:
     """Create and populate the plugin registry."""
     registry = PluginRegistry()
     registry.register(PythonPlugin())
+    registry.register(TypeScriptPlugin())
     return registry
 
 
