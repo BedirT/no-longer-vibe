@@ -117,10 +117,9 @@ def run_index(root: Path) -> IndexResult:
 
     # 10. Write map.json
     guide_dir = root / _GUIDE_DIR_NAME
-    map_path = guide_dir / "map.json"
-    write_map_json(
-        output_path=map_path,
-        repo_root=root,
+    map_path = write_map_json(
+        output_dir=guide_dir,
+        repo_root=str(root),
         graph=graph,
         classification=classification,
         reading_order=reading_order,

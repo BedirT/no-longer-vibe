@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-79",
+  "current_issue": "BED-70",
   "features": [
     {
       "issue": "BED-72",
@@ -56,8 +56,14 @@
       "title": "Session priming — compressed context from previous summaries",
       "status": "in-progress",
       "branch": "feat/bed-79-session-priming"
+    },
+    {
+      "issue": "BED-70",
+      "title": "map.json output — generate .codebase-guide/map.json per schema",
+      "status": "pr-open",
+      "branch": "feat/bed-70-map-json-output"
     }
   ],
   "blockers": [],
-  "next_action": "BED-79 PR needs to be created and merged."
+  "next_action": "BED-70 PR needs to be merged."
 }
