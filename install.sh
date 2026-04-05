@@ -178,6 +178,55 @@ install_extension() {
     fi
 
     print_success "VS Code extension installed"
+
+    # Configure MCP server for Claude Code
+    configure_mcp "$ext_dir"
+}
+
+# ── Step 4: MCP Server Config ─────────────────────────────────────────
+
+configure_mcp() {
+    local ext_dir="$1"
+    local mcp_server="$ext_dir/dist/mcpStandalone.js"
+
+    if [[ ! -f "$mcp_server" ]]; then
+        print_skip "Standalone MCP server not found — skipping MCP config"
+        return 0
+    fi
+
+    local claude_dir="$HOME/.claude"
+    if [[ ! -d "$claude_dir" ]]; then
+        print_skip "Claude Code not found (~/.claude/ does not exist) — skipping MCP config"
+        return 0
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        print_error "python3 required for MCP config — skipping"
+        return 1
+    fi
+
+    python3 -c "
+import json, os, sys
+
+config_path = os.path.expanduser('~/.claude/mcp.json')
+config = {}
+if os.path.exists(config_path):
+    with open(config_path) as f:
+        config = json.load(f)
+
+config.setdefault('mcpServers', {})
+config['mcpServers']['no-longer-vibe'] = {
+    'command': 'node',
+    'args': [sys.argv[1]],
+    'type': 'stdio'
+}
+
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=2)
+    f.write('\n')
+" "$mcp_server"
+
+    print_success "MCP server configured in ~/.claude/mcp.json"
 }
 
 # ── Run requested steps ─────────────────────────────────────────────────
