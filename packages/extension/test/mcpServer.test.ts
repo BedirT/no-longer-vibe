@@ -187,13 +187,18 @@ describe("mcpServer", () => {
       expect(textContent.text).toContain("not implemented");
     });
 
-    it("update_progress_tree returns not-implemented message", async () => {
-      const { server } = createMcpServer();
+    it("update_progress_tree emits event and returns confirmation", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: Array<{ tool: string }> = [];
+      toolEvents.event((e) => events.push(e));
+
       const result = await callTool(server, "update_progress_tree", {});
 
       const textContent = result.content[0];
       expect(textContent.type).toBe("text");
-      expect(textContent.text).toContain("not implemented");
+      expect(textContent.text).toContain("Progress tree refreshed");
+      expect(events).toHaveLength(1);
+      expect(events[0].tool).toBe("update_progress_tree");
     });
   });
 
