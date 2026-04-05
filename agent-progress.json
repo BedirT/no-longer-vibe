@@ -2,68 +2,124 @@
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
-  "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-70",
+  "current_milestone": "Phase 1: Core — COMPLETE",
+  "current_issue": null,
   "features": [
     {
-      "issue": "BED-72",
-      "title": "Skill scaffold — definition file, metadata, command registration",
+      "issue": "BED-60",
+      "title": "Project scaffolding",
       "status": "pr-merged",
-      "pr": "https://github.com/BedirT/no-longer-vibe/pull/2",
-      "branch": "feat/bed-72-skill-scaffold"
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/1"
+    },
+    {
+      "issue": "BED-72",
+      "title": "Skill scaffold",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/2"
     },
     {
       "issue": "BED-61",
-      "title": "File tree walker — .gitignore-aware source file collection",
+      "title": "File tree walker",
       "status": "pr-merged",
-      "pr": "https://github.com/BedirT/no-longer-vibe/pull/3",
-      "branch": "feat/bed-61-file-tree-walker"
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/3"
     },
     {
       "issue": "BED-62",
-      "title": "Language plugin architecture — interface for multi-language AST parsing",
+      "title": "Language plugin architecture",
       "status": "pr-merged",
-      "pr": "https://github.com/BedirT/no-longer-vibe/pull/4",
-      "branch": "feat/bed-62-language-plugin-architecture"
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/4"
     },
     {
       "issue": "BED-73",
-      "title": "progress.json management — create, read, update, stats",
-      "status": "pr-open",
-      "branch": "feat/bed-73-progress-json"
+      "title": "progress.json management",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/5"
     },
     {
       "issue": "BED-69",
-      "title": "Content hashing — SHA-256 for staleness detection",
-      "status": "pr-open",
-      "branch": "feat/bed-69-content-hashing"
+      "title": "Content hashing (SHA-256)",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/6"
+    },
+    {
+      "issue": "BED-67",
+      "title": "Entry point detection + complexity scoring",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/7"
     },
     {
       "issue": "BED-63",
-      "title": "Python language plugin — ast module + import resolution",
+      "title": "Python language plugin",
       "status": "pr-merged",
-      "pr": "https://github.com/BedirT/no-longer-vibe/pull/8",
-      "branch": "feat/bed-63-python-language-plugin"
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/8"
+    },
+    {
+      "issue": "BED-76",
+      "title": "/read-status command",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/9"
     },
     {
       "issue": "BED-64",
-      "title": "Dependency graph builder — directed graph from parsed imports",
-      "status": "in-progress",
-      "branch": "feat/bed-64-dependency-graph"
+      "title": "Dependency graph builder",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/10"
+    },
+    {
+      "issue": "BED-77",
+      "title": "/read-flagged command",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/11"
+    },
+    {
+      "issue": "BED-65",
+      "title": "Layer classifier",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/12"
     },
     {
       "issue": "BED-79",
-      "title": "Session priming — compressed context from previous summaries",
-      "status": "in-progress",
-      "branch": "feat/bed-79-session-priming"
+      "title": "Session priming",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/13"
+    },
+    {
+      "issue": "BED-66",
+      "title": "Three-pass reading order",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/14"
     },
     {
       "issue": "BED-70",
-      "title": "map.json output — generate .codebase-guide/map.json per schema",
-      "status": "pr-open",
-      "branch": "feat/bed-70-map-json-output"
+      "title": "map.json output",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/15"
+    },
+    {
+      "issue": "BED-71",
+      "title": "CLI interface",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/17"
+    },
+    {
+      "issue": "BED-78",
+      "title": "/read-refresh command",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/18"
+    },
+    {
+      "issue": "BED-74",
+      "title": "/read-index command",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/19"
+    },
+    {
+      "issue": "BED-75",
+      "title": "/read-next command",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/20"
     }
   ],
   "blockers": [],
-  "next_action": "BED-70 PR needs to be merged."
+  "next_action": "Phase 1 complete. Phase 2 (VS Code Extension Tier 1) is next — requires TypeScript setup and user input on visual behavior."
 }
