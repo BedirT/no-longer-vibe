@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": null,
+  "current_issue": "BED-67",
   "features": [
     {
       "issue": "BED-72",
@@ -30,6 +30,13 @@
       "title": "progress.json management — create, read, update, stats",
       "status": "pr-open",
       "branch": "feat/bed-73-progress-json"
+    },
+    {
+      "issue": "BED-67",
+      "title": "Entry point detection + complexity scoring",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/7",
+      "branch": "feat/bed-67-entry-point-complexity"
     }
   ],
   "blockers": [],
