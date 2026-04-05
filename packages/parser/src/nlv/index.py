@@ -33,6 +33,7 @@ from nlv.hashing import compute_content_hashes
 from nlv.layers import Layer, LayerClassification, classify_layers
 from nlv.output import write_map_json
 from nlv.plugins import ParseResult, PluginRegistry
+from nlv.plugins.go import GoPlugin
 from nlv.plugins.python import PythonPlugin
 from nlv.plugins.typescript import TypeScriptPlugin
 from nlv.progress import ProgressManager
@@ -158,6 +159,7 @@ def _setup_registry() -> PluginRegistry:
     registry = PluginRegistry()
     registry.register(PythonPlugin())
     registry.register(TypeScriptPlugin())
+    registry.register(GoPlugin())
     return registry
 
 
