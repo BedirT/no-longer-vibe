@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core — COMPLETE",
-  "current_issue": null,
+  "current_issue": "BED-96",
   "features": [
     {
       "issue": "BED-60",
@@ -121,5 +121,5 @@
     }
   ],
   "blockers": [],
-  "next_action": "Phase 1 complete. Phase 2 (VS Code Extension Tier 1) is next — requires TypeScript setup and user input on visual behavior."
+  "next_action": "BED-96 (MCP bridge) in review. No remaining issues in backlog after this."
 }
