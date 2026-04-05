@@ -156,10 +156,11 @@ def _walk_dir(
             nested_spec = _load_gitignore(entry)
             if nested_spec is not None:
                 gitignore_specs.append((rel + "/", nested_spec))
+            try:
                 _walk_dir(entry, root, extensions, gitignore_specs, results)
-                gitignore_specs.pop()
-            else:
-                _walk_dir(entry, root, extensions, gitignore_specs, results)
+            finally:
+                if nested_spec is not None:
+                    gitignore_specs.pop()
         elif entry.is_file():
             # Filter by extension
             if entry.suffix not in extensions:
