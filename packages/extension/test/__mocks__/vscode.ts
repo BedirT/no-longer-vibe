@@ -236,6 +236,59 @@ export enum TextEditorRevealType {
   AtTop = 3,
 }
 
+/** Decoration type options recorded during creation. */
+export interface MockDecorationTypeOptions {
+  backgroundColor?: string;
+  borderLeft?: string;
+  isWholeLine?: boolean;
+  [key: string]: unknown;
+}
+
+/** Mock TextEditorDecorationType for tracking. */
+export class MockTextEditorDecorationType {
+  options: MockDecorationTypeOptions;
+  private disposed = false;
+
+  constructor(options: MockDecorationTypeOptions) {
+    this.options = options;
+  }
+
+  dispose(): void {
+    this.disposed = true;
+  }
+
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+}
+
+/** Record of a setDecorations call. */
+export interface DecorationApplication {
+  decorationType: MockTextEditorDecorationType;
+  ranges: Range[];
+}
+
+/** All decoration types created during the test. */
+let decorationTypes: MockTextEditorDecorationType[] = [];
+/** All setDecorations calls during the test. */
+let decorationApplications: DecorationApplication[] = [];
+
+/** Returns all decoration types created via createTextEditorDecorationType. */
+export function __getDecorationTypes(): MockTextEditorDecorationType[] {
+  return decorationTypes;
+}
+
+/** Returns all setDecorations calls recorded during the test. */
+export function __getDecorationApplications(): DecorationApplication[] {
+  return decorationApplications;
+}
+
+/** Resets all decoration tracking state between tests. */
+export function __resetDecorationTracking(): void {
+  decorationTypes = [];
+  decorationApplications = [];
+}
+
 /** Mock editor tracking for test assertions. */
 interface MockEditorRecord {
   selection: Selection | undefined;
@@ -309,6 +362,35 @@ export const workspace = {
   }),
 };
 
+/** Mock visible text editors for setDecorations tracking. */
+let mockVisibleTextEditors: Array<{
+  document: { uri: Uri; fileName: string };
+  setDecorations: (type: MockTextEditorDecorationType, ranges: Range[]) => void;
+}> = [];
+
+/** Sets the mock visible text editors for testing. */
+export function __setVisibleTextEditors(
+  editors: Array<{
+    document: { uri: Uri; fileName: string };
+    setDecorations: (type: MockTextEditorDecorationType, ranges: Range[]) => void;
+  }>,
+): void {
+  mockVisibleTextEditors = editors;
+}
+
+/** Creates a mock editor for a given file path. */
+export function __createMockEditor(filePath: string): {
+  document: { uri: Uri; fileName: string };
+  setDecorations: (type: MockTextEditorDecorationType, ranges: Range[]) => void;
+} {
+  return {
+    document: { uri: Uri.file(filePath), fileName: filePath },
+    setDecorations: (type: MockTextEditorDecorationType, ranges: Range[]) => {
+      decorationApplications.push({ decorationType: type, ranges: [...ranges] });
+    },
+  };
+}
+
 export const window = {
   createOutputChannel: vi.fn((name: string): MockOutputChannel => {
     return new MockOutputChannel(name);
@@ -318,6 +400,16 @@ export const window = {
       return new Disposable(() => {});
     },
   ),
+  createTextEditorDecorationType: vi.fn(
+    (options: MockDecorationTypeOptions): MockTextEditorDecorationType => {
+      const decType = new MockTextEditorDecorationType(options);
+      decorationTypes.push(decType);
+      return decType;
+    },
+  ),
+  get visibleTextEditors() {
+    return mockVisibleTextEditors;
+  },
   showTextDocument: vi.fn(async () => {
     if (mockShowTextDocumentShouldThrow) {
       throw new Error("Failed to show text document");

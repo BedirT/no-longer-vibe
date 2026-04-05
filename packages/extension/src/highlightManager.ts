@@ -1,0 +1,236 @@
+import * as vscode from "vscode";
+import type { McpToolEvent, HighlightStyle } from "./mcpServer";
+
+/** Decoration style configuration for each highlight type. */
+interface DecorationStyleConfig {
+  backgroundColor: string;
+  borderLeft?: string;
+}
+
+/** Exact style specs from BED-83. */
+const STYLE_CONFIGS: Record<HighlightStyle, DecorationStyleConfig> = {
+  focus: {
+    backgroundColor: "rgba(59, 130, 246, 0.07)",
+    borderLeft: "3px solid rgba(59, 130, 246, 0.5)",
+  },
+  context: {
+    backgroundColor: "rgba(148, 163, 184, 0.06)",
+    // No border — secondary, should not compete for attention
+  },
+  warning: {
+    backgroundColor: "rgba(245, 158, 11, 0.07)",
+    borderLeft: "3px solid rgba(245, 158, 11, 0.5)",
+  },
+  "blast-radius": {
+    backgroundColor: "rgba(239, 68, 68, 0.07)",
+    borderLeft: "3px solid rgba(239, 68, 68, 0.4)",
+  },
+};
+
+/** A tracked highlight applied to a file. */
+export interface TrackedHighlight {
+  style: HighlightStyle;
+  startLine: number;
+  endLine: number;
+}
+
+/**
+ * Manages text editor decorations for highlight ranges.
+ *
+ * Creates decoration types for each highlight style on construction
+ * and subscribes to MCP tool events for highlight_range, clear_highlights,
+ * and clear_all commands.
+ */
+export class HighlightManager {
+  /** Decoration types keyed by style name. */
+  private readonly decorationTypes: Map<
+    HighlightStyle,
+    vscode.TextEditorDecorationType
+  > = new Map();
+
+  /** Active highlights per file path. */
+  private readonly activeHighlights: Map<string, TrackedHighlight[]> =
+    new Map();
+
+  /** Event subscription disposable. */
+  private readonly eventSubscription: vscode.Disposable;
+
+  /** Whether this manager has been disposed. */
+  private disposed = false;
+
+  constructor(onToolEvent: vscode.Event<McpToolEvent>) {
+    // Create decoration types for all four styles
+    for (const [style, config] of Object.entries(STYLE_CONFIGS)) {
+      const options: vscode.DecorationRenderOptions = {
+        backgroundColor: config.backgroundColor,
+        isWholeLine: true,
+      };
+
+      if (config.borderLeft) {
+        options.borderLeft = config.borderLeft;
+      }
+
+      const decorationType =
+        vscode.window.createTextEditorDecorationType(options);
+      this.decorationTypes.set(style as HighlightStyle, decorationType);
+    }
+
+    // Subscribe to MCP tool events
+    this.eventSubscription = onToolEvent((event) => {
+      if (this.disposed) {
+        return;
+      }
+      this.handleToolEvent(event);
+    });
+  }
+
+  /**
+   * Returns tracked highlights for a file, or undefined if none.
+   */
+  getHighlightsForFile(filePath: string): TrackedHighlight[] | undefined {
+    const highlights = this.activeHighlights.get(filePath);
+    if (!highlights || highlights.length === 0) {
+      return undefined;
+    }
+    return highlights;
+  }
+
+  /**
+   * Disposes all decoration types and clears state.
+   */
+  dispose(): void {
+    this.disposed = true;
+    this.eventSubscription.dispose();
+
+    for (const decorationType of this.decorationTypes.values()) {
+      decorationType.dispose();
+    }
+    this.decorationTypes.clear();
+    this.activeHighlights.clear();
+  }
+
+  /** Routes MCP tool events to handlers. */
+  private handleToolEvent(event: McpToolEvent): void {
+    switch (event.tool) {
+      case "highlight_range":
+        this.handleHighlightRange(event.params);
+        break;
+      case "clear_highlights":
+        this.handleClearHighlights(event.params);
+        break;
+      case "clear_all":
+        this.handleClearAll();
+        break;
+    }
+  }
+
+  /** Handles the highlight_range tool event. */
+  private handleHighlightRange(params: Record<string, unknown>): void {
+    const file = params.file as string;
+    const startLine = params.startLine as number;
+    const endLine = params.endLine as number;
+    const style = params.style as HighlightStyle;
+
+    const highlight: TrackedHighlight = { style, startLine, endLine };
+
+    // Add to tracking
+    const existing = this.activeHighlights.get(file) ?? [];
+    existing.push(highlight);
+    this.activeHighlights.set(file, existing);
+
+    // Apply decorations to visible editors
+    this.applyDecorationsForFile(file);
+  }
+
+  /** Handles the clear_highlights tool event. */
+  private handleClearHighlights(params: Record<string, unknown>): void {
+    const file = params.file as string | undefined;
+
+    if (file) {
+      this.activeHighlights.delete(file);
+      this.clearDecorationsForFile(file);
+    } else {
+      this.clearAllDecorations();
+    }
+  }
+
+  /** Handles the clear_all tool event. */
+  private handleClearAll(): void {
+    this.clearAllDecorations();
+  }
+
+  /**
+   * Applies all tracked decorations for a file to visible editors.
+   */
+  private applyDecorationsForFile(filePath: string): void {
+    const highlights = this.activeHighlights.get(filePath);
+    if (!highlights) {
+      return;
+    }
+
+    // Find visible editors for this file
+    const editors = this.findEditorsForFile(filePath);
+
+    // Group highlights by style
+    const rangesByStyle = new Map<HighlightStyle, vscode.Range[]>();
+    for (const highlight of highlights) {
+      const ranges = rangesByStyle.get(highlight.style) ?? [];
+      ranges.push(this.toRange(highlight.startLine, highlight.endLine));
+      rangesByStyle.set(highlight.style, ranges);
+    }
+
+    // Apply each style's ranges to each editor
+    for (const editor of editors) {
+      for (const [style, decorationType] of this.decorationTypes) {
+        const ranges = rangesByStyle.get(style) ?? [];
+        editor.setDecorations(decorationType, ranges);
+      }
+    }
+  }
+
+  /**
+   * Clears all decorations for a specific file.
+   */
+  private clearDecorationsForFile(filePath: string): void {
+    const editors = this.findEditorsForFile(filePath);
+
+    for (const editor of editors) {
+      for (const decorationType of this.decorationTypes.values()) {
+        editor.setDecorations(decorationType, []);
+      }
+    }
+  }
+
+  /**
+   * Clears all highlights and decorations across all files.
+   */
+  private clearAllDecorations(): void {
+    const filePaths = Array.from(this.activeHighlights.keys());
+    this.activeHighlights.clear();
+
+    for (const filePath of filePaths) {
+      this.clearDecorationsForFile(filePath);
+    }
+  }
+
+  /**
+   * Converts 1-indexed line numbers from MCP to 0-indexed VS Code Range.
+   */
+  private toRange(startLine: number, endLine: number): vscode.Range {
+    return new vscode.Range(
+      new vscode.Position(startLine - 1, 0),
+      new vscode.Position(endLine - 1, 0),
+    );
+  }
+
+  /**
+   * Finds visible text editors that have the given file open.
+   * Matches by file path suffix since MCP sends relative paths.
+   */
+  private findEditorsForFile(filePath: string): vscode.TextEditor[] {
+    return vscode.window.visibleTextEditors.filter((editor) => {
+      const editorPath = editor.document.uri.fsPath;
+      return editorPath === filePath || editorPath.endsWith(`/${filePath}`);
+    });
+  }
+}
