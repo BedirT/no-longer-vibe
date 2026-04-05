@@ -177,6 +177,88 @@ export class RelativePattern {
   ) {}
 }
 
+export class Position {
+  readonly line: number;
+  readonly character: number;
+
+  constructor(line: number, character: number) {
+    this.line = line;
+    this.character = character;
+  }
+}
+
+export class Selection {
+  readonly anchor: Position;
+  readonly active: Position;
+
+  constructor(anchor: Position, active: Position) {
+    this.anchor = anchor;
+    this.active = active;
+  }
+}
+
+export class Range {
+  readonly start: Position;
+  readonly end: Position;
+
+  constructor(start: Position, end: Position) {
+    this.start = start;
+    this.end = end;
+  }
+}
+
+export enum TextEditorRevealType {
+  Default = 0,
+  InCenter = 1,
+  InCenterIfOutsideViewport = 2,
+  AtTop = 3,
+}
+
+/** Mock editor tracking for test assertions. */
+interface MockEditorRecord {
+  selection: Selection | undefined;
+  revealRangeCalls: Array<{ range: Range; revealType: TextEditorRevealType }>;
+}
+
+let lastMockEditor: MockEditorRecord | undefined;
+
+/** Returns the last editor created by showTextDocument. */
+export function __getLastEditor(): MockEditorRecord | undefined {
+  return lastMockEditor;
+}
+
+/** Resets mock editor state between tests. */
+export function __resetMockEditors(): void {
+  lastMockEditor = undefined;
+  mockOpenTextDocumentResult = undefined;
+  mockShowTextDocumentResult = undefined;
+  mockShowTextDocumentShouldThrow = false;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mockOpenTextDocumentResult: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let mockShowTextDocumentResult: any;
+let mockShowTextDocumentShouldThrow = false;
+
+/** Sets what openTextDocument will return. Pass null to make it throw. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function __setOpenTextDocumentResult(result: any): void {
+  mockOpenTextDocumentResult = result;
+}
+
+/** Sets what showTextDocument will return. Pass null to make it throw. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function __setShowTextDocumentResult(result: any): void {
+  if (result === null) {
+    mockShowTextDocumentShouldThrow = true;
+    mockShowTextDocumentResult = undefined;
+  } else {
+    mockShowTextDocumentShouldThrow = false;
+    mockShowTextDocumentResult = result;
+  }
+}
+
 export const workspace = {
   get workspaceFolders() {
     return mockWorkspaceFolders;
@@ -194,10 +276,44 @@ export const workspace = {
     lastCreatedWatcher = new MockFileSystemWatcher();
     return lastCreatedWatcher;
   }),
+  openTextDocument: vi.fn(async (uri: Uri) => {
+    if (mockOpenTextDocumentResult === null) {
+      throw new Error(`File not found: ${uri.fsPath}`);
+    }
+    if (mockOpenTextDocumentResult !== undefined) {
+      return mockOpenTextDocumentResult;
+    }
+    return { uri };
+  }),
 };
 
 export const window = {
   createOutputChannel: vi.fn((name: string): MockOutputChannel => {
     return new MockOutputChannel(name);
+  }),
+  showTextDocument: vi.fn(async () => {
+    if (mockShowTextDocumentShouldThrow) {
+      throw new Error("Failed to show text document");
+    }
+    const editorRecord: MockEditorRecord = {
+      selection: undefined,
+      revealRangeCalls: [],
+    };
+    const editor = {
+      get selection() {
+        return editorRecord.selection;
+      },
+      set selection(sel: Selection) {
+        editorRecord.selection = sel;
+      },
+      revealRange(range: Range, revealType?: TextEditorRevealType): void {
+        editorRecord.revealRangeCalls.push({
+          range,
+          revealType: revealType ?? TextEditorRevealType.Default,
+        });
+      },
+    };
+    lastMockEditor = editorRecord;
+    return editor;
   }),
 };
