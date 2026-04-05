@@ -12,19 +12,39 @@ exactly. Do not skip steps.
 
 ## Input
 
-The user provides a Linear issue ID (e.g., BED-60). If no ID is given,
-ask for one.
+The user provides either:
+- A Linear issue ID (e.g., `BED-60`): implement that specific issue
+- The word `next`: automatically pick the next available issue
 
 ## Pipeline
 
-### Step 1: Read the Issue
+### Step 1: Pick and Claim the Issue
 
+**If a specific issue ID was given:**
 Use the Linear MCP to read the full issue: title, description,
 acceptance criteria, labels, milestone, and blocking/blocked-by
 relations. The issue description IS the spec.
 
+**If `next` was given:**
+Use the Linear MCP to find the next available issue:
+1. List issues in the "No Longer Vibe" project
+2. Filter to issues with status **Todo** or **Backlog** only — skip
+   any issue that is **In Progress**, **In Review**, **Done**, or
+   **Cancelled**
+3. Skip issues whose blocking dependencies are not yet **Done**
+4. Respect priority ordering — pick the highest-priority unblocked
+   issue
+5. Tell the user which issue you picked and why before proceeding
+
+**Claim the issue immediately:**
+Once you have the issue, **set its Linear status to "In Progress"**
+right away, before creating a branch or writing any code. This
+prevents other agents from picking the same issue. Also update
+`agent-progress.json` with the issue ID you are working on.
+
 If the issue description is ambiguous or incomplete, stop and ask the
-user for clarification before proceeding.
+user for clarification before proceeding (but keep the status as
+In Progress — you've claimed it).
 
 ### Step 2: Create Branch
 
@@ -81,8 +101,8 @@ The reviewer checks against `.claude/rules/code-review.md` criteria.
 
 ### Step 7: Update Linear
 
-Update the Linear issue status to reflect progress. Add a comment
-summarizing what was implemented.
+Set the Linear issue status to **Done**. Add a comment summarizing
+what was implemented, including a link to the PR.
 
 ### Step 8: Create PR
 
