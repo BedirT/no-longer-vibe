@@ -31,9 +31,10 @@ describe("mcpServer", () => {
       expect(names).toContain("mark_flagged");
       expect(names).toContain("set_codelens");
       expect(names).toContain("show_blast_radius");
+      expect(names).toContain("clear_blast_radius");
       expect(names).toContain("update_progress_tree");
       expect(names).toContain("clear_all");
-      expect(names).toHaveLength(9);
+      expect(names).toHaveLength(10);
     });
   });
 
@@ -176,15 +177,37 @@ describe("mcpServer", () => {
       expect(events[0].params.file).toBe("src/main.ts");
     });
 
-    it("show_blast_radius returns not-implemented message", async () => {
-      const { server } = createMcpServer();
+    it("show_blast_radius emits event and returns confirmation", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: McpToolEvent[] = [];
+      toolEvents.event((e) => events.push(e));
+
       const result = await callTool(server, "show_blast_radius", {
         symbol: "validateToken",
       });
 
       const textContent = result.content[0];
       expect(textContent.type).toBe("text");
-      expect(textContent.text).toContain("not implemented");
+      expect(textContent.text).toContain("validateToken");
+
+      expect(events).toHaveLength(1);
+      expect(events[0].tool).toBe("show_blast_radius");
+      expect(events[0].params.symbol).toBe("validateToken");
+    });
+
+    it("clear_blast_radius emits event and returns confirmation", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: McpToolEvent[] = [];
+      toolEvents.event((e) => events.push(e));
+
+      const result = await callTool(server, "clear_blast_radius", {});
+
+      const textContent = result.content[0];
+      expect(textContent.type).toBe("text");
+      expect(textContent.text).toContain("cleared");
+
+      expect(events).toHaveLength(1);
+      expect(events[0].tool).toBe("clear_blast_radius");
     });
 
     it("update_progress_tree emits event and returns confirmation", async () => {

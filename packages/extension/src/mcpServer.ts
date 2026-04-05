@@ -28,6 +28,7 @@ const TOOL_NAMES = [
   "mark_flagged",
   "set_codelens",
   "show_blast_radius",
+  "clear_blast_radius",
   "update_progress_tree",
   "clear_all",
 ] as const;
@@ -68,7 +69,8 @@ export function createMcpServer(): {
   registerMarkRead(server, toolEvents);
   registerMarkFlagged(server, toolEvents);
   registerSetCodelens(server, toolEvents);
-  registerShowBlastRadius(server);
+  registerShowBlastRadius(server, toolEvents);
+  registerClearBlastRadius(server, toolEvents);
   registerUpdateProgressTree(server, toolEvents);
   registerClearAll(server, toolEvents);
 
@@ -287,19 +289,49 @@ function registerSetCodelens(
   );
 }
 
-function registerShowBlastRadius(server: McpServer): void {
+function registerShowBlastRadius(
+  server: McpServer,
+  toolEvents: vscode.EventEmitter<McpToolEvent>,
+): void {
   server.tool(
     "show_blast_radius",
-    "Show the blast radius of changes to a symbol (stub - not yet implemented)",
+    "Show the blast radius of changes to a symbol — highlights all transitively affected files in the explorer",
     {
       symbol: z.string().describe("Symbol name to analyze"),
     },
-    () => {
+    (args) => {
+      toolEvents.fire({
+        tool: "show_blast_radius",
+        params: { symbol: args.symbol },
+      });
+
       return {
         content: [
           {
             type: "text" as const,
-            text: "show_blast_radius is not implemented yet",
+            text: `Showing blast radius for symbol '${args.symbol}'`,
+          },
+        ],
+      };
+    },
+  );
+}
+
+function registerClearBlastRadius(
+  server: McpServer,
+  toolEvents: vscode.EventEmitter<McpToolEvent>,
+): void {
+  server.tool(
+    "clear_blast_radius",
+    "Clear the blast radius visualization from the explorer",
+    () => {
+      toolEvents.fire({ tool: "clear_blast_radius", params: {} });
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "Blast radius cleared",
           },
         ],
       };
