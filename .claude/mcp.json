@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "no-longer-vibe": {
+      "command": "node",
+      "args": ["packages/extension/dist/mcpServer.js"],
+      "type": "stdio"
+    }
+  }
+}

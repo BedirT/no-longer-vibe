@@ -37,6 +37,39 @@ noted when they originally flagged each file.
 6. Update `progress.json` atomically after each change.
 7. Continue to the next flagged file until all are resolved.
 
+## VS Code Extension Integration (MCP Tools)
+
+When the No Longer Vibe VS Code extension is connected, use MCP tools
+to enhance the flagged-file review. **Always check if tools are
+available before calling them** — the skill must work without MCP.
+
+### MCP-Enhanced Flow
+
+When MCP tools are available:
+
+1. **Open the flagged file** after displaying the briefing:
+   - Call `open_file` with the file path.
+
+2. **Highlight the relevant section** if the original note references
+   specific lines or functions:
+   - Call `highlight_range` with style `"warning"` on the flagged area.
+
+3. **Update decorations** on resolution:
+   - On `confirmed`: call `mark_read` with the file path, then
+     `clear_highlights` for that file.
+   - On `flag <new_reason>`: call `mark_flagged` with the file path
+     and updated reason, then `clear_highlights`.
+   - On `skim` / `skimmed`: call `clear_highlights` for that file.
+
+4. **Clear highlights** before moving to the next flagged file.
+
+### Fallback Without MCP
+
+When MCP tools are not available, the skill works in text-only mode.
+Briefings are displayed inline, file content is read into the
+conversation, and progress is tracked via `progress.json`. No errors
+are shown when MCP tools are absent.
+
 ## Edge Cases
 
 - If no files are flagged, tell the user: "No flagged files. All clear."
