@@ -16,6 +16,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { getSocketPath } from "./ipcProtocol";
+import { IpcBridgeClient } from "./ipcClient";
 
 // --- Types (duplicated from types.ts to avoid pulling in vscode deps) ---
 
@@ -184,10 +186,20 @@ function computeBlastRadius(map: CodebaseMap, filePath: string): string[] {
  * registrations. This server operates on the filesystem directly
  * and does not depend on VS Code.
  *
+ * When an IPC bridge client is provided and connected, visual tools
+ * (highlight_range, clear_highlights, etc.) are forwarded to the
+ * VS Code extension for real visual effects. Otherwise they degrade
+ * gracefully.
+ *
  * @param workspaceRoot - The root directory of the workspace.
  *   When omitted, defaults to the current working directory.
+ * @param ipcClient - Optional IPC bridge client for forwarding
+ *   visual tool calls to the VS Code extension.
  */
-export function createStandaloneMcpServer(workspaceRoot?: string): {
+export function createStandaloneMcpServer(
+  workspaceRoot?: string,
+  ipcClient?: IpcBridgeClient,
+): {
   server: McpServer;
 } {
   const root = workspaceRoot ?? process.cwd();
@@ -218,7 +230,11 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
         .optional()
         .describe("Line number to scroll to"),
     },
-    (args) => {
+    async (args) => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("open_file", args);
+        if (result) return result;
+      }
       const result: Record<string, unknown> = {
         opened: true,
         path: args.path,
@@ -398,7 +414,7 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
     },
   );
 
-  // --- Tools that return success but need extension for visual effect ---
+  // --- Tools that forward to extension when IPC connected, else degrade ---
 
   server.tool(
     "highlight_range",
@@ -419,14 +435,18 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
         .enum(["focus", "context", "warning", "blast-radius"])
         .describe("Highlight style"),
     },
-    (args) => {
+    async (args) => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("highlight_range", args);
+        if (result) return result;
+      }
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify({
               success: true,
-              note: "Install VS Code extension for visual highlighting",
+              note: "VS Code extension not connected — no visual effect",
               file: args.file,
               startLine: args.startLine,
               endLine: args.endLine,
@@ -447,7 +467,11 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
         .optional()
         .describe("File path to clear, or omit to clear all"),
     },
-    () => {
+    async (args) => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("clear_highlights", args);
+        if (result) return result;
+      }
       return {
         content: [
           {
@@ -477,14 +501,18 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
         )
         .describe("CodeLens entries to display"),
     },
-    (args) => {
+    async (args) => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("set_codelens", args);
+        if (result) return result;
+      }
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify({
               success: true,
-              note: "Install VS Code extension for CodeLens",
+              note: "VS Code extension not connected — no visual effect",
               file: args.file,
               entries: args.entries.length,
             }),
@@ -498,7 +526,11 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
     "clear_blast_radius",
     "Clear the blast radius visualization",
     {},
-    () => {
+    async () => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("clear_blast_radius", {});
+        if (result) return result;
+      }
       return {
         content: [
           {
@@ -514,7 +546,11 @@ export function createStandaloneMcpServer(workspaceRoot?: string): {
     "clear_all",
     "Reset all decorations, highlights, and visual state",
     {},
-    () => {
+    async () => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("clear_all", {});
+        if (result) return result;
+      }
       return {
         content: [
           {
@@ -564,7 +600,13 @@ function isMainModule(): boolean {
 }
 
 if (isMainModule()) {
-  const server = createStandaloneMcpServer();
-  const transport = new StdioServerTransport();
-  server.server.connect(transport);
+  const root = process.cwd();
+  const socketPath = getSocketPath(root);
+  const client = new IpcBridgeClient(socketPath);
+
+  client.connect().then((connected) => {
+    const server = createStandaloneMcpServer(root, connected ? client : undefined);
+    const transport = new StdioServerTransport();
+    server.server.connect(transport);
+  });
 }
