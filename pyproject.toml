@@ -1,0 +1,40 @@
+[project]
+name = "nlv"
+version = "0.1.0"
+description = "Deterministic codebase reading order tool"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["packages/parser/src/nlv"]
+
+[project.scripts]
+nlv = "nlv.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pyright>=1.1",
+    "ruff>=0.4",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/parser/tests"]
+
+[tool.pyright]
+pythonVersion = "3.11"
+include = ["packages/parser/src"]
+extraPaths = ["packages/parser/src"]
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "strict"
+
+[tool.ruff]
+src = ["packages/parser/src"]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "T201"]
