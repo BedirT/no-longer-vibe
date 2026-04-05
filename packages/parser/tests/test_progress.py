@@ -29,7 +29,10 @@ def _make_map_data(files: list[str] | None = None) -> dict[str, Any]:
         "version": "1.0.0",
         "repo_root": "/tmp/test-repo",
         "generated_at": "2026-04-05T10:00:00Z",
-        "content_hashes": {f: hashlib.sha256(f.encode()).hexdigest()[:8] for f in files},
+        "content_hashes": {
+            f: hashlib.sha256(f.encode()).hexdigest()[:8]
+            for f in files
+        },
         "total_files": len(files),
         "layers": {
             "foundation": {"description": "No deps", "files": files[:1]},
@@ -200,7 +203,10 @@ class TestUpdateFile:
 
         mgr = ProgressManager(guide_dir)
         mgr.create(map_data, map_hash)
-        mgr.update_file("src/a.py", status=FileStatus.CONFIRMED, summary="Config loader.")
+        mgr.update_file(
+            "src/a.py", status=FileStatus.CONFIRMED,
+            summary="Config loader.",
+        )
 
         data = mgr.load()
         assert data["files"]["src/a.py"]["status"] == "confirmed"
@@ -292,7 +298,10 @@ class TestStats:
         mgr.create(map_data, map_hash)
 
         stats = mgr.compute_stats()
-        assert stats == {"total": 2, "confirmed": 0, "flagged": 0, "skimmed": 0, "unread": 2}
+        assert stats == {
+            "total": 2, "confirmed": 0, "flagged": 0,
+            "skimmed": 0, "unread": 2,
+        }
 
     def test_compute_stats_mixed(self, tmp_path: Path) -> None:
         guide_dir = tmp_path / ".codebase-guide"
@@ -307,7 +316,10 @@ class TestStats:
         mgr.update_file("c.py", status=FileStatus.SKIMMED)
 
         stats = mgr.compute_stats()
-        assert stats == {"total": 4, "confirmed": 1, "flagged": 1, "skimmed": 1, "unread": 1}
+        assert stats == {
+            "total": 4, "confirmed": 1, "flagged": 1,
+            "skimmed": 1, "unread": 1,
+        }
 
     def test_compute_stats_requires_load(self, tmp_path: Path) -> None:
         """compute_stats works on a freshly loaded manager."""
