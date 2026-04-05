@@ -1,0 +1,29 @@
+{
+  "allowedMcpServers": [
+    { "serverName": "linear-server" }
+  ],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /Users/bedirt/.superset/projects/no-longer-vibe && test -f pyproject.toml && ./scripts/run-check.sh uv run pytest -x || test ! -f pyproject.toml",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "cd /Users/bedirt/.superset/projects/no-longer-vibe && test -f pyproject.toml && ./scripts/run-check.sh uv run ruff check . || test ! -f pyproject.toml",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "cd /Users/bedirt/.superset/projects/no-longer-vibe && test -f pyproject.toml && ./scripts/run-check.sh uv run pyright || test ! -f pyproject.toml",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

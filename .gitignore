@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+.tox/
+
+# uv
+uv.lock
+
+# Type checking / lint caches
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (extension)
+node_modules/
+packages/extension/dist/
+*.vsix
+
+# No Longer Vibe output
+.codebase-guide/
+
+# Environment
+.env
+.env.*
+
+# Claude Code (keep settings.local.json for harness, ignore logs)
+.claude/logs/
