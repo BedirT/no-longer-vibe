@@ -41,8 +41,12 @@ visual context.
 1. Run `./scripts/init.sh` to verify environment
 2. Read `agent-progress.json` for context from previous sessions
 3. Resume from where the last session left off, or pick the next
-   unblocked Linear issue
-4. Update `agent-progress.json` before ending the session
+   unblocked Linear issue — **always check issue statuses in Linear
+   before picking**. Issues marked "In Progress" are claimed by
+   another agent — do not pick them.
+4. When you start working on an issue, **set its Linear status to
+   "In Progress" immediately** so other agents know it's claimed
+5. Update `agent-progress.json` before ending the session
 
 ## Project Docs
 
