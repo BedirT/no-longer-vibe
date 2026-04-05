@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Note: prefer running ./install.sh from the repo root for full installation.
+#
 # Install No Longer Vibe skills for Claude Code.
 #
 # Usage:
