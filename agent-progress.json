@@ -54,10 +54,11 @@
     {
       "issue": "BED-79",
       "title": "Session priming — compressed context from previous summaries",
-      "status": "in-progress",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/13",
       "branch": "feat/bed-79-session-priming"
     }
   ],
   "blockers": [],
-  "next_action": "BED-79 PR needs to be created and merged."
+  "next_action": "BED-79 complete. Pick next unblocked issue."
 }
