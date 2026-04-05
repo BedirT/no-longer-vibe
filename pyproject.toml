@@ -19,10 +19,11 @@ dev = [
     "pytest>=8.0",
     "pyright>=1.1",
     "ruff>=0.4",
+    "pyyaml>=6.0",
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/parser/tests"]
+testpaths = ["packages"]
 
 [tool.pyright]
 pythonVersion = "3.11"
