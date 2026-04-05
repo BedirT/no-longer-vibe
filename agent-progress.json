@@ -41,10 +41,11 @@
     {
       "issue": "BED-63",
       "title": "Python language plugin — ast module + import resolution",
-      "status": "in-progress",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/8",
       "branch": "feat/bed-63-python-language-plugin"
     }
   ],
   "blockers": [],
-  "next_action": "BED-63 PR needs to be created and merged."
+  "next_action": "BED-64 (dependency graph builder) or BED-65 (topological sort) are next."
 }
