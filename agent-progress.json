@@ -34,7 +34,8 @@
     {
       "issue": "BED-69",
       "title": "Content hashing — SHA-256 for staleness detection",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/6",
       "branch": "feat/bed-69-content-hashing"
     }
   ],
