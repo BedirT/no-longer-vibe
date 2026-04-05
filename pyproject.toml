@@ -3,6 +3,9 @@ name = "nlv"
 version = "0.1.0"
 description = "Deterministic codebase reading order tool"
 requires-python = ">=3.11"
+dependencies = [
+    "pathspec>=0.12",
+]
 
 [build-system]
 requires = ["hatchling"]
