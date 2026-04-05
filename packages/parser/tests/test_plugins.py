@@ -20,7 +20,6 @@ from nlv.plugins import (
     PluginRegistry,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fake plugin for testing the Protocol contract
 # ---------------------------------------------------------------------------
@@ -85,7 +84,9 @@ class TestImportRef:
         assert ref.is_relative is True
 
     def test_create_absolute_import(self) -> None:
-        ref = ImportRef(source="os.path", specifiers=["join", "exists"], is_relative=False)
+        ref = ImportRef(
+            source="os.path", specifiers=["join", "exists"], is_relative=False,
+        )
         assert ref.source == "os.path"
         assert ref.specifiers == ["join", "exists"]
         assert ref.is_relative is False
@@ -145,7 +146,9 @@ class TestFunctionRef:
     """Tests for the FunctionRef dataclass."""
 
     def test_create_function_ref(self) -> None:
-        ref = FunctionRef(name="process", line=10, end_line=25, calls=["validate", "save"])
+        ref = FunctionRef(
+            name="process", line=10, end_line=25, calls=["validate", "save"],
+        )
         assert ref.name == "process"
         assert ref.line == 10
         assert ref.end_line == 25
