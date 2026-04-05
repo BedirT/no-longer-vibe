@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { CallerCountProvider } from "./callerCount";
+import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
 import { createMcpServer } from "./mcpServer";
@@ -31,6 +32,50 @@ export async function activate(
   const watcherDisposable = watchMapJson();
   context.subscriptions.push(watcherDisposable);
 
+  // Set up caller count gutter decorations
+  const callerCountProvider = new CallerCountProvider();
+  context.subscriptions.push({ dispose: () => callerCountProvider.dispose() });
+
+  // Set up CodeLens provider for caller/callee annotations
+  const codeLensProvider = new CodeLensProvider();
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider({ scheme: "file" }, codeLensProvider),
+  );
+  context.subscriptions.push({ dispose: () => codeLensProvider.dispose() });
+
+  if (mapData) {
+    callerCountProvider.updateMapData(mapData);
+    codeLensProvider.updateMapData(mapData);
+  }
+
+  // Re-apply decorations when map data changes
+  const mapDataSub = onMapDataChanged((data) => {
+    callerCountProvider.updateMapData(data);
+    codeLensProvider.updateMapData(data);
+  });
+  context.subscriptions.push(mapDataSub);
+
+  // Re-apply caller count decorations when active editor changes
+  const editorSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+    if (editor) {
+      callerCountProvider.updateDecorations(editor);
+    }
+  });
+  context.subscriptions.push(editorSub);
+
+  // Register the navigate-to-caller command for CodeLens clicks
+  const navigateCmd = vscode.commands.registerCommand(
+    "noLongerVibe.navigateToCaller",
+    async (filePath?: string) => {
+      if (!filePath) {
+        return;
+      }
+      const uri = vscode.Uri.file(filePath);
+      await vscode.commands.executeCommand("vscode.open", uri);
+    },
+  );
+  context.subscriptions.push(navigateCmd);
+
   // Register FileDecorationProvider for file status colors
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (workspaceFolders && workspaceFolders.length > 0) {
@@ -42,7 +87,7 @@ export async function activate(
     );
     context.subscriptions.push(decorationProvider);
 
-    // Subscribe to MCP tool events for decoration updates
+    // Subscribe to MCP tool events for decoration and CodeLens updates
     const { toolEvents } = createMcpServer();
     const mcpDisposables = decorationProvider.subscribeMcpEvents(
       toolEvents.event,
@@ -51,31 +96,24 @@ export async function activate(
       context.subscriptions.push(d);
     }
 
+    // Wire MCP set_codelens events to the CodeLens provider
+    const codeLensMcpSub = toolEvents.event((event) => {
+      if (event.tool === "set_codelens") {
+        const file = event.params.file as string;
+        const entries = event.params.entries as Array<{
+          line: number;
+          text: string;
+          command?: string;
+        }>;
+        codeLensProvider.setMcpOverrides(file, entries);
+      }
+    });
+    context.subscriptions.push(codeLensMcpSub);
+
     outputChannel.appendLine("File decoration provider registered.");
   }
 
-  // Set up caller count gutter decorations
-  const callerCountProvider = new CallerCountProvider();
-  context.subscriptions.push({ dispose: () => callerCountProvider.dispose() });
-
-  if (mapData) {
-    callerCountProvider.updateMapData(mapData);
-  }
-
-  // Re-apply decorations when map data changes
-  const mapDataSub = onMapDataChanged((data) => {
-    callerCountProvider.updateMapData(data);
-  });
-  context.subscriptions.push(mapDataSub);
-
-  // Re-apply decorations when active editor changes
-  const editorSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
-    if (editor) {
-      callerCountProvider.updateDecorations(editor);
-    }
-  });
-  context.subscriptions.push(editorSub);
-
+  outputChannel.appendLine("CodeLens provider registered.");
   outputChannel.appendLine("No Longer Vibe extension activated.");
 }
 

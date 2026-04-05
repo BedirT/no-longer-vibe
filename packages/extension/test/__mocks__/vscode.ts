@@ -461,3 +461,58 @@ export const window = {
     return editor;
   }),
 };
+
+/** Mock CodeLens class matching vscode.CodeLens. */
+export class CodeLens {
+  range: Range;
+  command?: {
+    title: string;
+    command: string;
+    arguments?: unknown[];
+  };
+
+  constructor(
+    range: Range,
+    command?: { title: string; command: string; arguments?: unknown[] },
+  ) {
+    this.range = range;
+    this.command = command;
+  }
+}
+
+/** Track registered CodeLens providers for testing. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let registeredCodeLensProviders: any[] = [];
+
+/** Returns all registered CodeLens providers. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function __getRegisteredCodeLensProviders(): any[] {
+  return registeredCodeLensProviders;
+}
+
+/** Resets registered CodeLens providers. */
+export function __resetCodeLensProviders(): void {
+  registeredCodeLensProviders = [];
+}
+
+export const languages = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  registerCodeLensProvider: vi.fn((selector: any, provider: any) => {
+    registeredCodeLensProviders.push({ selector, provider });
+    return new Disposable(() => {
+      const idx = registeredCodeLensProviders.findIndex(
+        (r) => r.provider === provider,
+      );
+      if (idx >= 0) {
+        registeredCodeLensProviders.splice(idx, 1);
+      }
+    });
+  }),
+};
+
+export const commands = {
+  executeCommand: vi.fn(async () => {}),
+  registerCommand: vi.fn((_command: string, _callback: (...args: unknown[]) => void) => {
+    return new Disposable(() => {});
+  }),
+};

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { extractDeclaredName } from "./functionPatterns";
 import type { CodebaseMap, ReadingOrderEntry } from "./types";
 
 /**
@@ -25,23 +26,6 @@ const CALLER_COLORS = {
   normal: { light: "#475569", dark: "#94a3b8" },
   hot: { light: "#1e40af", dark: "#60a5fa" },
 } as const;
-
-/**
- * Regex patterns for detecting function/class declaration lines.
- * Each pattern is matched against individual lines of source code.
- */
-const FUNCTION_PATTERNS: RegExp[] = [
-  // JS/TS: function declarations (with optional export/async/default)
-  /(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)/,
-  // JS/TS: arrow function or function expression assignments
-  /(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?(?:\([^)]*\)|[^=])\s*=>/,
-  // JS/TS: class declarations
-  /(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)/,
-  // Python: def statements
-  /^(?:\s*)(?:async\s+)?def\s+(\w+)\s*\(/,
-  // Python: class statements
-  /^(?:\s*)class\s+(\w+)/,
-];
 
 /**
  * Provides caller count gutter decorations for function declarations.
@@ -118,7 +102,7 @@ export class CallerCountProvider {
     // Scan each line for function/class declarations that match exports
     for (let lineIndex = 0; lineIndex < document.lineCount; lineIndex++) {
       const lineText = document.lineAt(lineIndex).text;
-      const declaredName = this.extractDeclaredName(lineText);
+      const declaredName = extractDeclaredName(lineText);
 
       if (declaredName && exports.has(declaredName)) {
         this.applyDecoration(editor, lineIndex, callerCount);
@@ -170,20 +154,6 @@ export class CallerCountProvider {
     return this.mapData?.reading_order.find(
       (entry) => entry.path === relativePath,
     );
-  }
-
-  /**
-   * Extracts the declared name from a line of code, if it contains
-   * a function, class, or method declaration.
-   */
-  private extractDeclaredName(lineText: string): string | undefined {
-    for (const pattern of FUNCTION_PATTERNS) {
-      const match = pattern.exec(lineText);
-      if (match?.[1]) {
-        return match[1];
-      }
-    }
-    return undefined;
   }
 
   /**
