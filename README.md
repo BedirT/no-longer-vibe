@@ -32,33 +32,36 @@ Built as a Python parser + Claude Code skill + optional VS Code extension. Zero 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
 - Node.js 18+ (only for the VS Code extension)
 
-### 1. Install the parser
+### Install
 
 ```bash
 git clone https://github.com/BedirT/no-longer-vibe.git
 cd no-longer-vibe
-uv sync
+./install.sh
 ```
 
-### 2. Index your codebase
+That's it. The installer sets up:
+- `nlv` CLI on your PATH
+- Claude Code skills (`/read-index`, `/read-next`, etc.)
+- VS Code extension (if VS Code is installed)
+
+You can also install components individually:
+```bash
+./install.sh --parser-only     # just the CLI
+./install.sh --skill-only      # just Claude Code skills
+./install.sh --extension-only  # just VS Code extension
+```
+
+To uninstall everything: `./uninstall.sh`
+
+### Start reading
 
 ```bash
-nlv /path/to/your/project
+nlv /path/to/your/project    # generate the codebase map
 ```
 
-This generates `.codebase-guide/map.json` with your dependency graph, layer classification, and reading order.
-
-### 3. Install the Claude Code skill
-
-```bash
-./packages/skill/install.sh          # global install
-./packages/skill/install.sh --local  # project-local install
+Open Claude Code and start reading:
 ```
-
-### 4. Start reading
-
-```
-/read-index .        # index the codebase (or re-index)
 /read-next           # get the next file with structural briefing
                      # read the code, ask Claude questions inline
 done                 # mark as confirmed, move to next
