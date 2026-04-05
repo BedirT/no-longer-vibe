@@ -1,18 +1,24 @@
 {
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
-  "last_session": "2026-04-05T07:49:00Z",
+  "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": null,
+  "current_issue": "BED-61",
   "features": [
     {
       "issue": "BED-72",
       "title": "Skill scaffold — definition file, metadata, command registration",
-      "status": "pr-open",
+      "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/2",
       "branch": "feat/bed-72-skill-scaffold"
+    },
+    {
+      "issue": "BED-61",
+      "title": "File tree walker — .gitignore-aware source file collection",
+      "status": "pr-open",
+      "branch": "feat/bed-61-file-tree-walker"
     }
   ],
   "blockers": [],
-  "next_action": "BED-61 and BED-62 are blocked by BED-60 (in progress). Next unblocked: BED-73 (progress.json management, blocked by BED-72) once PR merges."
+  "next_action": "BED-62 (language plugin architecture) is next unblocked issue after BED-61"
 }
