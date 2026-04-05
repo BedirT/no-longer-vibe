@@ -147,7 +147,9 @@ class ProgressManager:
         entry["note"] = note
         if summary is not None:
             entry["summary"] = summary
-        if status is not FileStatus.UNREAD:
+        if status is FileStatus.UNREAD:
+            entry["read_at"] = None
+        else:
             entry["read_at"] = _now_iso()
 
         data["stats"] = _compute_stats(data["files"])

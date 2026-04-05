@@ -525,6 +525,29 @@ class TestEdgeCases:
         stats = mgr2.compute_stats()
         assert stats["unread"] == 1
 
+    def test_unknown_status_counted_as_unread(
+        self, tmp_path: Path,
+    ) -> None:
+        """Unknown status values are counted as unread."""
+        guide_dir = tmp_path / ".codebase-guide"
+        map_data = _make_map_data(["a.py"])
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+
+        # Inject an unknown status directly on disk
+        data = mgr.load()
+        data["files"]["a.py"]["status"] = "alien_status"
+        raw = json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr2 = ProgressManager(guide_dir)
+        mgr2.load()
+        stats = mgr2.compute_stats()
+        assert stats["unread"] == 1
+        assert stats["total"] == 1
+
     def test_file_status_enum_values(self) -> None:
         """FileStatus enum has the four expected values."""
         assert FileStatus.CONFIRMED.value == "confirmed"
