@@ -16,6 +16,24 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "nlv-sidebar",
+          "title": "No Longer Vibe",
+          "icon": "$(list-tree)"
+        }
+      ]
+    },
+    "views": {
+      "nlv-sidebar": [
+        {
+          "id": "nlv.progressTree",
+          "name": "Reading Progress",
+          "type": "tree"
+        }
+      ]
+    },
     "colors": [
       {
         "id": "noLongerVibe.confirmed",

@@ -4,6 +4,7 @@ import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
 import { createMcpServer } from "./mcpServer";
+import { ProgressTreeProvider } from "./progressTree";
 
 /**
  * Called by VS Code when the extension activates.
@@ -110,7 +111,33 @@ export async function activate(
     });
     context.subscriptions.push(codeLensMcpSub);
 
+    // Register progress tree sidebar view
+    const progressTree = new ProgressTreeProvider(workspaceRoot);
+    context.subscriptions.push(
+      vscode.window.registerTreeDataProvider("nlv.progressTree", progressTree),
+    );
+    context.subscriptions.push({ dispose: () => progressTree.dispose() });
+
+    if (mapData) {
+      progressTree.updateMapData(mapData);
+    }
+
+    // Subscribe progress tree to MCP events
+    const progressTreeMcpDisposables = progressTree.subscribeMcpEvents(
+      toolEvents.event,
+    );
+    for (const d of progressTreeMcpDisposables) {
+      context.subscriptions.push(d);
+    }
+
+    // Refresh progress tree when map data changes
+    const progressTreeMapSub = onMapDataChanged((data) => {
+      progressTree.updateMapData(data);
+    });
+    context.subscriptions.push(progressTreeMapSub);
+
     outputChannel.appendLine("File decoration provider registered.");
+    outputChannel.appendLine("Progress tree view registered.");
   }
 
   outputChannel.appendLine("CodeLens provider registered.");

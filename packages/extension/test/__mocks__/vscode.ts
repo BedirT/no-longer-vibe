@@ -178,6 +178,44 @@ export class ThemeColor {
   }
 }
 
+export class ThemeIcon {
+  static readonly File = new ThemeIcon("file");
+  static readonly Folder = new ThemeIcon("folder");
+
+  readonly id: string;
+  readonly color?: ThemeColor;
+
+  constructor(id: string, color?: ThemeColor) {
+    this.id = id;
+    this.color = color;
+  }
+}
+
+export enum TreeItemCollapsibleState {
+  None = 0,
+  Collapsed = 1,
+  Expanded = 2,
+}
+
+export class TreeItem {
+  label?: string;
+  description?: string;
+  tooltip?: string;
+  collapsibleState?: TreeItemCollapsibleState;
+  iconPath?: ThemeIcon | Uri;
+  command?: { command: string; title: string; arguments?: unknown[] };
+  contextValue?: string;
+  resourceUri?: Uri;
+
+  constructor(
+    label: string,
+    collapsibleState?: TreeItemCollapsibleState,
+  ) {
+    this.label = label;
+    this.collapsibleState = collapsibleState ?? TreeItemCollapsibleState.None;
+  }
+}
+
 /** Mock FileDecoration matching the vscode.FileDecoration interface. */
 export class FileDecoration {
   badge?: string;
@@ -351,6 +389,15 @@ export function __setShowTextDocumentResult(result: any): void {
   }
 }
 
+export const commands = {
+  executeCommand: vi.fn(async (..._args: unknown[]) => {
+    // noop
+  }),
+  registerCommand: vi.fn((_command: string, _callback: (...args: unknown[]) => void) => {
+    return new Disposable(() => {});
+  }),
+};
+
 export const workspace = {
   get workspaceFolders() {
     return mockWorkspaceFolders;
@@ -418,6 +465,16 @@ export const window = {
   registerFileDecorationProvider: vi.fn(
     (_provider: unknown): Disposable => {
       return new Disposable(() => {});
+    },
+  ),
+  registerTreeDataProvider: vi.fn(
+    (_viewId: string, _provider: unknown): Disposable => {
+      return new Disposable(() => {});
+    },
+  ),
+  createTreeView: vi.fn(
+    (_viewId: string, _options: unknown): { dispose: () => void } => {
+      return { dispose: () => {} };
     },
   ),
   createTextEditorDecorationType: vi.fn(
@@ -510,9 +567,3 @@ export const languages = {
   }),
 };
 
-export const commands = {
-  executeCommand: vi.fn(async () => {}),
-  registerCommand: vi.fn((_command: string, _callback: (...args: unknown[]) => void) => {
-    return new Disposable(() => {});
-  }),
-};

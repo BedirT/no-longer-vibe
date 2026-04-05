@@ -69,7 +69,7 @@ export function createMcpServer(): {
   registerMarkFlagged(server, toolEvents);
   registerSetCodelens(server, toolEvents);
   registerShowBlastRadius(server);
-  registerUpdateProgressTree(server);
+  registerUpdateProgressTree(server, toolEvents);
   registerClearAll(server, toolEvents);
 
   return { server, toolEvents };
@@ -307,16 +307,21 @@ function registerShowBlastRadius(server: McpServer): void {
   );
 }
 
-function registerUpdateProgressTree(server: McpServer): void {
+function registerUpdateProgressTree(
+  server: McpServer,
+  toolEvents: vscode.EventEmitter<McpToolEvent>,
+): void {
   server.tool(
     "update_progress_tree",
-    "Refresh the sidebar progress tree view (stub - not yet implemented)",
+    "Refresh the sidebar progress tree view",
     () => {
+      toolEvents.fire({ tool: "update_progress_tree", params: {} });
+
       return {
         content: [
           {
             type: "text" as const,
-            text: "update_progress_tree is not implemented yet",
+            text: "Progress tree refreshed",
           },
         ],
       };
