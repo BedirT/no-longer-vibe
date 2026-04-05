@@ -481,8 +481,49 @@ class TestEdgeCases:
         data = mgr.load()
         assert data["files"]["a.py"]["status"] == "confirmed"
         assert data["files"]["a.py"]["summary"] == "All good now."
+        assert data["files"]["a.py"]["note"] is None
         assert data["stats"]["confirmed"] == 1
         assert data["stats"]["flagged"] == 0
+
+    def test_create_raises_if_progress_exists(self, tmp_path: Path) -> None:
+        """create() refuses to overwrite existing progress."""
+        guide_dir = tmp_path / ".codebase-guide"
+        map_data = _make_map_data()
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+
+        with pytest.raises(FileExistsError):
+            mgr.create(map_data, map_hash)
+
+    def test_create_with_force_overwrites(self, tmp_path: Path) -> None:
+        """create(force=True) overwrites existing progress."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        mgr.update_file("a.py", status=FileStatus.CONFIRMED, summary="Ok.")
+
+        mgr.create(map_data, map_hash, force=True)
+        data = mgr.load()
+        assert data["files"]["a.py"]["status"] == "unread"
+
+    def test_compute_stats_auto_loads(self, tmp_path: Path) -> None:
+        """compute_stats works without explicit load()."""
+        guide_dir = tmp_path / ".codebase-guide"
+        map_data = _make_map_data(["a.py"])
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr1 = ProgressManager(guide_dir)
+        mgr1.create(map_data, map_hash)
+
+        mgr2 = ProgressManager(guide_dir)
+        stats = mgr2.compute_stats()
+        assert stats["unread"] == 1
 
     def test_file_status_enum_values(self) -> None:
         """FileStatus enum has the four expected values."""
