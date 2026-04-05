@@ -4,6 +4,8 @@ import { CallerCountProvider } from "./callerCount";
 import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
+import { getSocketPath } from "./ipcProtocol";
+import { IpcBridgeServer } from "./ipcServer";
 import { createMcpServer } from "./mcpServer";
 import { ProgressTreeProvider } from "./progressTree";
 
@@ -160,6 +162,41 @@ export async function activate(
     outputChannel.appendLine("File decoration provider registered.");
     outputChannel.appendLine("Blast radius provider registered.");
     outputChannel.appendLine("Progress tree view registered.");
+
+    // Start IPC bridge server so the standalone MCP server can forward
+    // visual tool calls to this extension process.
+    const socketPath = getSocketPath(workspaceRoot);
+    const ipcServer = new IpcBridgeServer(
+      socketPath,
+      async (tool: string, params: Record<string, unknown>) => {
+        toolEvents.fire({ tool, params });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[via extension] ${tool} executed`,
+            },
+          ],
+        };
+      },
+    );
+    ipcServer
+      .start()
+      .then(() => {
+        outputChannel.appendLine(
+          `IPC bridge server listening on ${socketPath}`,
+        );
+      })
+      .catch((err: unknown) => {
+        outputChannel.appendLine(
+          `IPC bridge server failed to start: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    context.subscriptions.push({
+      dispose: () => {
+        ipcServer.stop();
+      },
+    });
   }
 
   outputChannel.appendLine("CodeLens provider registered.");

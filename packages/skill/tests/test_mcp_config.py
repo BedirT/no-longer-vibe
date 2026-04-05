@@ -67,7 +67,7 @@ class TestMcpConfigFile:
             "MCP server command must be 'node'"
         )
 
-    def test_server_args_point_to_mcp_server_js(self) -> None:
+    def test_server_args_point_to_mcp_standalone_js(self) -> None:
         mcp_json = REPO_ROOT / ".claude" / "mcp.json"
         if not mcp_json.is_file():
             return
@@ -75,8 +75,9 @@ class TestMcpConfigFile:
         server = config.get("mcpServers", {}).get("no-longer-vibe", {})
         args = server.get("args", [])
         assert len(args) >= 1, "MCP server args must include the script path"
-        assert "mcpServer" in args[0], (
-            "MCP server args must reference the mcpServer entry point"
+        assert "mcpStandalone" in args[0], (
+            "MCP server args must reference the mcpStandalone entry point "
+            "(bridges to VS Code extension via IPC when available)"
         )
 
     def test_server_type_is_stdio(self) -> None:
