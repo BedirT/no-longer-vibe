@@ -39,6 +39,17 @@ Print the current reading progress.
    Sessions: <n> | Avg pace: ~<n> files/session
    ```
 
+## Implementation
+
+Run the Python formatter via:
+
+```bash
+uv run python -c "from nlv.read_status import format_read_status; from pathlib import Path; print(format_read_status(Path('.codebase-guide')))"
+```
+
+The `format_read_status(guide_dir)` function handles all edge cases
+and returns a formatted string ready to display.
+
 ## Edge Cases
 
 - If `progress.json` does not exist, tell the user to start reading
