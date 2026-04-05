@@ -6,6 +6,7 @@ FunctionRef, ParseResult), and the plugin registry with auto-detection.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -33,13 +34,17 @@ class FakePythonPlugin:
         return "python"
 
     @property
-    def extensions(self) -> list[str]:
+    def extensions(self) -> Sequence[str]:
         return [".py", ".pyi"]
 
     def parse_file(self, path: Path) -> ParseResult:
-        return ParseResult(imports=[], exports=[], functions=[], entry_point=False)
+        return ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
 
-    def resolve_import(self, import_ref: ImportRef, from_file: Path) -> Path | None:
+    def resolve_import(
+        self, import_ref: ImportRef, from_file: Path,
+    ) -> Path | None:
         return None
 
 
@@ -51,13 +56,17 @@ class FakeTypeScriptPlugin:
         return "typescript"
 
     @property
-    def extensions(self) -> list[str]:
+    def extensions(self) -> Sequence[str]:
         return [".ts", ".tsx", ".js", ".jsx"]
 
     def parse_file(self, path: Path) -> ParseResult:
-        return ParseResult(imports=[], exports=[], functions=[], entry_point=False)
+        return ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
 
-    def resolve_import(self, import_ref: ImportRef, from_file: Path) -> Path | None:
+    def resolve_import(
+        self, import_ref: ImportRef, from_file: Path,
+    ) -> Path | None:
         return None
 
 
@@ -69,6 +78,72 @@ class IncompletePlugin:
         return "broken"
 
 
+class _OverlappingPlugin:
+    """Plugin whose extensions partially overlap with FakePythonPlugin."""
+
+    @property
+    def name(self) -> str:
+        return "pyw-handler"
+
+    @property
+    def extensions(self) -> Sequence[str]:
+        return [".pyw", ".py"]  # .py collides
+
+    def parse_file(self, path: Path) -> ParseResult:
+        return ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
+
+    def resolve_import(
+        self, import_ref: ImportRef, from_file: Path,
+    ) -> Path | None:
+        return None
+
+
+class _NoDotPlugin:
+    """Plugin with extensions missing the leading dot."""
+
+    @property
+    def name(self) -> str:
+        return "nodot"
+
+    @property
+    def extensions(self) -> Sequence[str]:
+        return ["py"]
+
+    def parse_file(self, path: Path) -> ParseResult:
+        return ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
+
+    def resolve_import(
+        self, import_ref: ImportRef, from_file: Path,
+    ) -> Path | None:
+        return None
+
+
+class _DuplicateNamePlugin:
+    """Plugin whose name collides with FakePythonPlugin."""
+
+    @property
+    def name(self) -> str:
+        return "python"  # same name, different extensions
+
+    @property
+    def extensions(self) -> Sequence[str]:
+        return [".pyw"]
+
+    def parse_file(self, path: Path) -> ParseResult:
+        return ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
+
+    def resolve_import(
+        self, import_ref: ImportRef, from_file: Path,
+    ) -> Path | None:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Data type tests
 # ---------------------------------------------------------------------------
@@ -78,32 +153,40 @@ class TestImportRef:
     """Tests for the ImportRef dataclass."""
 
     def test_create_relative_import(self) -> None:
-        ref = ImportRef(source=".utils", specifiers=["helper"], is_relative=True)
+        ref = ImportRef(
+            source=".utils", specifiers=("helper",), is_relative=True,
+        )
         assert ref.source == ".utils"
-        assert ref.specifiers == ["helper"]
+        assert ref.specifiers == ("helper",)
         assert ref.is_relative is True
 
     def test_create_absolute_import(self) -> None:
         ref = ImportRef(
-            source="os.path", specifiers=["join", "exists"], is_relative=False,
+            source="os.path",
+            specifiers=("join", "exists"),
+            is_relative=False,
         )
         assert ref.source == "os.path"
-        assert ref.specifiers == ["join", "exists"]
+        assert ref.specifiers == ("join", "exists")
         assert ref.is_relative is False
 
     def test_empty_specifiers(self) -> None:
-        ref = ImportRef(source="os", specifiers=[], is_relative=False)
-        assert ref.specifiers == []
+        ref = ImportRef(source="os", specifiers=(), is_relative=False)
+        assert ref.specifiers == ()
 
     def test_equality(self) -> None:
-        a = ImportRef(source="os", specifiers=["path"], is_relative=False)
-        b = ImportRef(source="os", specifiers=["path"], is_relative=False)
+        a = ImportRef(source="os", specifiers=("path",), is_relative=False)
+        b = ImportRef(source="os", specifiers=("path",), is_relative=False)
         assert a == b
 
     def test_inequality(self) -> None:
-        a = ImportRef(source="os", specifiers=["path"], is_relative=False)
-        b = ImportRef(source="sys", specifiers=["path"], is_relative=False)
+        a = ImportRef(source="os", specifiers=("path",), is_relative=False)
+        b = ImportRef(source="sys", specifiers=("path",), is_relative=False)
         assert a != b
+
+    def test_frozen_and_hashable(self) -> None:
+        ref = ImportRef(source="os", specifiers=("path",), is_relative=False)
+        assert hash(ref)  # must not raise
 
 
 class TestExportRef:
@@ -147,41 +230,54 @@ class TestFunctionRef:
 
     def test_create_function_ref(self) -> None:
         ref = FunctionRef(
-            name="process", line=10, end_line=25, calls=["validate", "save"],
+            name="process",
+            line=10,
+            end_line=25,
+            calls=("validate", "save"),
         )
         assert ref.name == "process"
         assert ref.line == 10
         assert ref.end_line == 25
-        assert ref.calls == ["validate", "save"]
+        assert ref.calls == ("validate", "save")
 
     def test_no_calls(self) -> None:
-        ref = FunctionRef(name="noop", line=1, end_line=2, calls=[])
-        assert ref.calls == []
+        ref = FunctionRef(name="noop", line=1, end_line=2, calls=())
+        assert ref.calls == ()
 
     def test_equality(self) -> None:
-        a = FunctionRef(name="f", line=1, end_line=5, calls=["g"])
-        b = FunctionRef(name="f", line=1, end_line=5, calls=["g"])
+        a = FunctionRef(name="f", line=1, end_line=5, calls=("g",))
+        b = FunctionRef(name="f", line=1, end_line=5, calls=("g",))
         assert a == b
+
+    def test_frozen_and_hashable(self) -> None:
+        ref = FunctionRef(name="f", line=1, end_line=5, calls=("g",))
+        assert hash(ref)
 
 
 class TestParseResult:
     """Tests for the ParseResult dataclass."""
 
     def test_empty_result(self) -> None:
-        result = ParseResult(imports=[], exports=[], functions=[], entry_point=False)
-        assert result.imports == []
-        assert result.exports == []
-        assert result.functions == []
+        result = ParseResult(
+            imports=(), exports=(), functions=(), entry_point=False,
+        )
+        assert result.imports == ()
+        assert result.exports == ()
+        assert result.functions == ()
         assert result.entry_point is False
 
     def test_populated_result(self) -> None:
-        imp = ImportRef(source="os", specifiers=["path"], is_relative=False)
+        imp = ImportRef(
+            source="os", specifiers=("path",), is_relative=False,
+        )
         exp = ExportRef(name="main", kind=ExportKind.FUNCTION, line=10)
-        func = FunctionRef(name="main", line=10, end_line=20, calls=["print"])
+        func = FunctionRef(
+            name="main", line=10, end_line=20, calls=("print",),
+        )
         result = ParseResult(
-            imports=[imp],
-            exports=[exp],
-            functions=[func],
+            imports=(imp,),
+            exports=(exp,),
+            functions=(func,),
             entry_point=True,
         )
         assert len(result.imports) == 1
@@ -190,7 +286,9 @@ class TestParseResult:
         assert result.entry_point is True
 
     def test_entry_point_detection(self) -> None:
-        result = ParseResult(imports=[], exports=[], functions=[], entry_point=True)
+        result = ParseResult(
+            imports=(), exports=(), functions=(), entry_point=True,
+        )
         assert result.entry_point is True
 
 
@@ -207,14 +305,18 @@ class TestLanguagePluginProtocol:
         assert plugin.name == "python"
         assert ".py" in plugin.extensions
 
-    def test_parse_file_returns_parse_result(self, tmp_path: Path) -> None:
+    def test_parse_file_returns_parse_result(
+        self, tmp_path: Path,
+    ) -> None:
         plugin: LanguagePlugin = FakePythonPlugin()
         result = plugin.parse_file(tmp_path / "test.py")
         assert isinstance(result, ParseResult)
 
-    def test_resolve_import_returns_path_or_none(self, tmp_path: Path) -> None:
+    def test_resolve_import_returns_path_or_none(
+        self, tmp_path: Path,
+    ) -> None:
         plugin: LanguagePlugin = FakePythonPlugin()
-        ref = ImportRef(source="os", specifiers=[], is_relative=False)
+        ref = ImportRef(source="os", specifiers=(), is_relative=False)
         result = plugin.resolve_import(ref, tmp_path / "test.py")
         assert result is None or isinstance(result, Path)
 
@@ -272,8 +374,33 @@ class TestPluginRegistry:
     def test_duplicate_extension_raises_error(self) -> None:
         registry = PluginRegistry()
         registry.register(FakePythonPlugin())
-        with pytest.raises(ValueError, match=r"\.py"):
+        with pytest.raises(ValueError, match="python"):
             registry.register(FakePythonPlugin())
+
+    def test_duplicate_extension_registration_is_atomic(self) -> None:
+        """Failed registration must not leave orphaned extensions."""
+        registry = PluginRegistry()
+        registry.register(FakePythonPlugin())
+        with pytest.raises(ValueError):
+            registry.register(_OverlappingPlugin())
+        # .pyw must NOT be registered (partial registration rolled back)
+        assert registry.get_plugin_for_file(Path("x.pyw")) is None
+        assert "pyw-handler" not in [
+            p.name for p in registry.list_plugins()
+        ]
+
+    def test_duplicate_name_raises_error(self) -> None:
+        """Two plugins with the same name must be rejected."""
+        registry = PluginRegistry()
+        registry.register(FakePythonPlugin())
+        with pytest.raises(ValueError, match="python"):
+            registry.register(_DuplicateNamePlugin())
+
+    def test_extension_without_dot_raises_error(self) -> None:
+        """Extensions must start with a dot."""
+        registry = PluginRegistry()
+        with pytest.raises(ValueError, match="must start with"):
+            registry.register(_NoDotPlugin())
 
     def test_get_plugin_by_name(self) -> None:
         registry = PluginRegistry()
