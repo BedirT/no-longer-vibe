@@ -22,6 +22,9 @@ const CALL_TIMEOUT = 5000;
 /** Timeout for the initial connection attempt (ms). */
 const CONNECT_TIMEOUT = 1000;
 
+/** Maximum buffer size for incoming data (1 MB). */
+const MAX_BUFFER_SIZE = 1024 * 1024;
+
 export class IpcBridgeClient {
   private socket: net.Socket | undefined;
   private connected = false;
@@ -133,6 +136,10 @@ export class IpcBridgeClient {
 
   private setupSocketHandlers(socket: net.Socket): void {
     socket.on("data", (chunk: Buffer) => {
+      if (this.buffer.length + chunk.length > MAX_BUFFER_SIZE) {
+        socket.destroy();
+        return;
+      }
       this.buffer += chunk.toString();
 
       let delimiterIndex: number;

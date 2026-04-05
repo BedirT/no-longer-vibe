@@ -7,6 +7,7 @@
  */
 
 import * as crypto from "node:crypto";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
@@ -30,7 +31,15 @@ export interface IpcResponse {
  * other without configuration.
  */
 export function getSocketPath(workspaceRoot: string): string {
-  const normalized = workspaceRoot.replace(/\/+$/, "");
+  // Resolve symlinks and normalize case for deterministic matching
+  // between VS Code (workspaceFolders) and standalone (process.cwd()).
+  let resolved: string;
+  try {
+    resolved = fs.realpathSync(workspaceRoot);
+  } catch {
+    resolved = workspaceRoot;
+  }
+  const normalized = resolved.replace(/\/+$/, "");
   const hash = crypto
     .createHash("sha256")
     .update(normalized)

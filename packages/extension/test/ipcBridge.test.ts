@@ -172,6 +172,49 @@ describe("IPC Bridge", () => {
       expect(result).toBeUndefined();
     });
 
+    it("handles concurrent tool calls correctly", async () => {
+      const handler = async (tool: string) => ({
+        content: [{ type: "text" as const, text: tool }],
+      });
+
+      const server = new IpcBridgeServer(socketPath, handler);
+      await server.start();
+
+      const client = new IpcBridgeClient(socketPath);
+      await client.connect();
+
+      const results = await Promise.all([
+        client.callTool("highlight_range", { file: "a.ts", startLine: 1, endLine: 2, style: "focus" }),
+        client.callTool("clear_highlights", {}),
+        client.callTool("clear_all", {}),
+      ]);
+
+      expect(results[0]!.content[0].text).toBe("highlight_range");
+      expect(results[1]!.content[0].text).toBe("clear_highlights");
+      expect(results[2]!.content[0].text).toBe("clear_all");
+
+      client.disconnect();
+      await server.stop();
+    });
+
+    it("rejects unknown tool names", async () => {
+      const handler = async () => ({
+        content: [{ type: "text" as const, text: "should not reach" }],
+      });
+
+      const server = new IpcBridgeServer(socketPath, handler);
+      await server.start();
+
+      const client = new IpcBridgeClient(socketPath);
+      await client.connect();
+
+      const result = await client.callTool("unknown_tool", {});
+      expect(result).toBeUndefined();
+
+      client.disconnect();
+      await server.stop();
+    });
+
     it("handles handler errors gracefully", async () => {
       const handler = async () => {
         throw new Error("Handler failed");

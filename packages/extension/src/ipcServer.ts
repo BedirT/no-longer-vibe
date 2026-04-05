@@ -23,6 +23,21 @@ export type ToolCallHandler = (
   params: Record<string, unknown>,
 ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 
+/** Maximum buffer size per connection (1 MB). */
+const MAX_BUFFER_SIZE = 1024 * 1024;
+
+/** Tool names accepted over the IPC bridge. */
+const ALLOWED_TOOLS = new Set([
+  "highlight_range",
+  "clear_highlights",
+  "open_file",
+  "set_codelens",
+  "show_blast_radius",
+  "clear_blast_radius",
+  "update_progress_tree",
+  "clear_all",
+]);
+
 export class IpcBridgeServer {
   private server: net.Server | undefined;
   private readonly socketPath: string;
@@ -82,7 +97,16 @@ export class IpcBridgeServer {
   private handleConnection(socket: net.Socket): void {
     let buffer = "";
 
+    // Swallow errors on client sockets — the "close" event
+    // handles cleanup via the this.clients Set.
+    socket.on("error", () => {});
+
     socket.on("data", (chunk: Buffer) => {
+      if (buffer.length + chunk.length > MAX_BUFFER_SIZE) {
+        socket.destroy();
+        return;
+      }
+
       buffer += chunk.toString();
 
       let delimiterIndex: number;
@@ -107,20 +131,35 @@ export class IpcBridgeServer {
       return; // Ignore malformed messages
     }
 
+    if (!ALLOWED_TOOLS.has(request.tool)) {
+      const response: IpcResponse = {
+        id: request.id,
+        error: `Unknown tool: ${request.tool}`,
+      };
+      if (!socket.destroyed) {
+        socket.write(encodeMessage(response));
+      }
+      return;
+    }
+
     this.onToolCall(request.tool, request.params)
       .then((result) => {
         const response: IpcResponse = {
           id: request.id,
           result,
         };
-        socket.write(encodeMessage(response));
+        if (!socket.destroyed) {
+          socket.write(encodeMessage(response));
+        }
       })
       .catch((err: unknown) => {
         const response: IpcResponse = {
           id: request.id,
           error: err instanceof Error ? err.message : String(err),
         };
-        socket.write(encodeMessage(response));
+        if (!socket.destroyed) {
+          socket.write(encodeMessage(response));
+        }
       });
   }
 }

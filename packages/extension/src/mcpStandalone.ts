@@ -230,7 +230,11 @@ export function createStandaloneMcpServer(
         .optional()
         .describe("Line number to scroll to"),
     },
-    (args) => {
+    async (args) => {
+      if (ipcClient?.isConnected()) {
+        const result = await ipcClient.callTool("open_file", args);
+        if (result) return result;
+      }
       const result: Record<string, unknown> = {
         opened: true,
         path: args.path,
