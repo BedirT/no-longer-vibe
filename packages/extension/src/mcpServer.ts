@@ -67,7 +67,7 @@ export function createMcpServer(): {
   registerOpenFile(server, toolEvents);
   registerMarkRead(server, toolEvents);
   registerMarkFlagged(server, toolEvents);
-  registerSetCodelens(server);
+  registerSetCodelens(server, toolEvents);
   registerShowBlastRadius(server);
   registerUpdateProgressTree(server);
   registerClearAll(server, toolEvents);
@@ -247,10 +247,13 @@ function registerMarkFlagged(
   );
 }
 
-function registerSetCodelens(server: McpServer): void {
+function registerSetCodelens(
+  server: McpServer,
+  toolEvents: vscode.EventEmitter<McpToolEvent>,
+): void {
   server.tool(
     "set_codelens",
-    "Set CodeLens annotations on a file (stub - not yet implemented)",
+    "Set CodeLens annotations on a file, overriding automatic caller/callee annotations",
     {
       file: z.string().describe("Relative file path"),
       entries: z
@@ -263,12 +266,20 @@ function registerSetCodelens(server: McpServer): void {
         )
         .describe("CodeLens entries to display"),
     },
-    () => {
+    (args) => {
+      toolEvents.fire({
+        tool: "set_codelens",
+        params: {
+          file: args.file,
+          entries: args.entries,
+        },
+      });
+
       return {
         content: [
           {
             type: "text" as const,
-            text: "set_codelens is not implemented yet",
+            text: `Set ${String(args.entries.length)} CodeLens entries on ${args.file}`,
           },
         ],
       };

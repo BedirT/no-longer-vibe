@@ -155,8 +155,11 @@ describe("mcpServer", () => {
   });
 
   describe("stub tools", () => {
-    it("set_codelens returns not-implemented message", async () => {
-      const { server } = createMcpServer();
+    it("set_codelens returns success message and emits event", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: McpToolEvent[] = [];
+      toolEvents.event((e: McpToolEvent) => events.push(e));
+
       const result = await callTool(server, "set_codelens", {
         file: "src/main.ts",
         entries: [{ line: 1, text: "Called by: foo.ts" }],
@@ -165,7 +168,12 @@ describe("mcpServer", () => {
       expect(result.content).toBeDefined();
       const textContent = result.content[0];
       expect(textContent.type).toBe("text");
-      expect(textContent.text).toContain("not implemented");
+      expect(textContent.text).toContain("1 CodeLens entries on src/main.ts");
+
+      // Verify event emission
+      expect(events).toHaveLength(1);
+      expect(events[0].tool).toBe("set_codelens");
+      expect(events[0].params.file).toBe("src/main.ts");
     });
 
     it("show_blast_radius returns not-implemented message", async () => {
