@@ -1,4 +1,4 @@
-"""Three-pass reading order computation (BED-66).
+"""Three-pass reading order computation (BED-66, BED-92).
 
 Computes a reading order for source files arranged into three sequential
 passes based on Dr. Park's architect-verifying-implementation research:
@@ -17,6 +17,14 @@ then fanIn (most-imported first), then alphabetical.
 Test files are co-located with their implementation files: after scheduling
 an implementation file, its paired test files are inserted immediately
 after it. Standalone test utilities go in Pass 3.
+
+BED-92 additions:
+- Accepts an optional ``ReadingConfig`` to customize behavior.
+- Enhanced contract surface heuristics: name-based detection, __init__.py
+  re-export detection.
+- Configurable test file handling: skip, separate pass, or place in a
+  specific pass.
+- Custom per-file/per-glob pass overrides.
 """
 
 from __future__ import annotations
@@ -26,6 +34,11 @@ import logging
 import os
 from dataclasses import dataclass
 
+from nlv.config import (
+    ReadingConfig,
+    TestFileMode,
+    match_custom_pass_override,
+)
 from nlv.graph import DependencyGraph
 from nlv.layers import Layer, LayerClassification
 from nlv.plugins import ExportKind, ParseResult
@@ -56,6 +69,16 @@ _CONTRACT_EXPORT_RATIO: float = 0.5
 # Minimum fanIn to qualify as a contract surface when the file has
 # low export information.
 _CONTRACT_FAN_IN_THRESHOLD: int = 3
+
+# File name stems that are considered contract surfaces by convention,
+# regardless of their export composition.
+_CONTRACT_NAME_STEMS: frozenset[str] = frozenset({
+    "types",
+    "interfaces",
+    "models",
+    "schema",
+    "constants",
+})
 
 # Layer ordering for tie-breaking (lower value = earlier in reading order).
 _LAYER_ORDER: dict[Layer, int] = {
@@ -121,6 +144,7 @@ def compute_reading_order(
     graph: DependencyGraph,
     classification: LayerClassification,
     parse_results: dict[str, ParseResult],
+    config: ReadingConfig | None = None,
 ) -> tuple[ReadingOrderEntry, ...]:
     """Compute the three-pass reading order for all files.
 
@@ -128,15 +152,22 @@ def compute_reading_order(
         graph: The dependency graph.
         classification: Layer classification for every file.
         parse_results: Raw parse results for export/import data.
+        config: Optional reading configuration. Uses defaults if None.
 
     Returns:
         A tuple of ReadingOrderEntry in reading order.
     """
+    if config is None:
+        config = ReadingConfig()
+
     if not graph.nodes:
         return ()
 
     all_files = set(graph.nodes)
     test_pairs = find_paired_test_files(all_files)
+
+    # Handle skip_tests / test_pass=skip: exclude test files entirely
+    should_skip_tests = config.skip_tests or config.test_pass == TestFileMode.SKIP
 
     # Classify each non-test file into a pass
     pass_assignments = _assign_passes(
@@ -144,6 +175,7 @@ def compute_reading_order(
         classification=classification,
         parse_results=parse_results,
         test_pairs=test_pairs,
+        config=config,
     )
 
     # Sort files within each pass
@@ -153,16 +185,16 @@ def compute_reading_order(
         classification=classification,
     )
 
-    # Interleave test files after their implementation files
-    final_order = _interleave_test_files(
+    final_order, pass_assignments = _apply_test_strategy(
+        config=config,
+        should_skip_tests=should_skip_tests,
         sorted_order=sorted_order,
-        test_pairs=test_pairs,
         pass_assignments=pass_assignments,
+        test_pairs=test_pairs,
         graph=graph,
         classification=classification,
     )
 
-    # Build the result entries with sequential indices
     return _build_entries(
         ordered_paths=final_order,
         graph=graph,
@@ -171,6 +203,42 @@ def compute_reading_order(
         pass_assignments=pass_assignments,
         test_pairs=test_pairs,
     )
+
+
+def _apply_test_strategy(
+    *,
+    config: ReadingConfig,
+    should_skip_tests: bool,
+    sorted_order: list[str],
+    pass_assignments: dict[str, ReadingPass],
+    test_pairs: dict[str, str],
+    graph: DependencyGraph,
+    classification: LayerClassification,
+) -> tuple[list[str], dict[str, ReadingPass]]:
+    """Apply the configured test file strategy to the sorted order."""
+    if should_skip_tests:
+        filtered = [p for p in sorted_order if not detect_test_file(p)]
+        assignments = {
+            p: rp for p, rp in pass_assignments.items()
+            if not detect_test_file(p)
+        }
+        return filtered, assignments
+
+    if config.test_pass == TestFileMode.SEPARATE:
+        return _separate_test_files(
+            sorted_order=sorted_order,
+            pass_assignments=pass_assignments,
+            graph=graph,
+            classification=classification,
+        ), pass_assignments
+
+    return _interleave_test_files(
+        sorted_order=sorted_order,
+        test_pairs=test_pairs,
+        pass_assignments=pass_assignments,
+        graph=graph,
+        classification=classification,
+    ), pass_assignments
 
 
 # ---------------------------------------------------------------------------
@@ -260,13 +328,18 @@ def _assign_passes(
     classification: LayerClassification,
     parse_results: dict[str, ParseResult],
     test_pairs: dict[str, str],
+    config: ReadingConfig,
 ) -> dict[str, ReadingPass]:
     """Assign each file to one of the three reading passes.
 
     Test files paired with an implementation inherit its pass.
-    Standalone test utilities and conftest go to UTILITY.
+    Standalone test utilities and conftest go to UTILITY (or as
+    configured by config.test_pass).
     """
     assignments: dict[str, ReadingPass] = {}
+
+    # Determine which pass unpaired/orphan tests should go in
+    test_default_pass = _test_mode_to_reading_pass(config.test_pass)
 
     for path in sorted(graph.nodes):
         if detect_test_file(path):
@@ -276,6 +349,7 @@ def _assign_passes(
             graph=graph,
             classification=classification,
             parse_results=parse_results,
+            config=config,
         )
 
     # Assign test files
@@ -285,12 +359,28 @@ def _assign_passes(
         if test_path in test_pairs:
             impl_path = test_pairs[test_path]
             assignments[test_path] = assignments.get(
-                impl_path, ReadingPass.UTILITY,
+                impl_path, test_default_pass,
             )
         else:
-            assignments[test_path] = ReadingPass.UTILITY
+            assignments[test_path] = test_default_pass
 
     return assignments
+
+
+def _test_mode_to_reading_pass(mode: TestFileMode) -> ReadingPass:
+    """Convert a TestFileMode to the corresponding ReadingPass.
+
+    For SEPARATE and SKIP modes, we default to UTILITY since test files
+    will be handled specially (moved to end or removed).
+    """
+    mode_map: dict[TestFileMode, ReadingPass] = {
+        TestFileMode.CONTRACTS: ReadingPass.CONTRACTS,
+        TestFileMode.DATA_FLOW: ReadingPass.DATA_FLOW,
+        TestFileMode.UTILITY: ReadingPass.UTILITY,
+        TestFileMode.SEPARATE: ReadingPass.UTILITY,
+        TestFileMode.SKIP: ReadingPass.UTILITY,
+    }
+    return mode_map[mode]
 
 
 def _classify_pass(
@@ -299,15 +389,21 @@ def _classify_pass(
     graph: DependencyGraph,
     classification: LayerClassification,
     parse_results: dict[str, ParseResult],
+    config: ReadingConfig,
 ) -> ReadingPass:
     """Classify a single non-test file into a reading pass."""
+    # Check custom pass overrides first (highest priority)
+    override = match_custom_pass_override(path, config)
+    if override is not None:
+        return ReadingPass(override)
+
     if _is_utility_path(path):
         return ReadingPass.UTILITY
 
     node = graph.nodes[path]
     result = parse_results.get(path)
 
-    if _is_contract_surface(node=node, result=result):
+    if _is_contract_surface(path=path, node=node, result=result):
         return ReadingPass.CONTRACTS
 
     return ReadingPass.DATA_FLOW
@@ -321,15 +417,30 @@ def _is_utility_path(path: str) -> bool:
 
 def _is_contract_surface(
     *,
+    path: str,
     node: object,
     result: ParseResult | None,
 ) -> bool:
     """Determine if a file is a contract surface (Pass 1).
 
     A file qualifies if:
-    1. It has a high ratio of type/class exports to total exports, OR
-    2. It has high fanIn with low fanOut (widely imported interface).
+    1. Its name matches a known contract-surface convention
+       (types.py, interfaces.py, models.py, schema.py, constants.py), OR
+    2. It is an ``__init__.py`` that re-exports (imports + exports), OR
+    3. It has a high ratio of type/class exports to total exports, OR
+    4. It has high fanIn with low fanOut (widely imported interface).
     """
+    # Check name-based contract heuristic
+    basename = os.path.basename(path)
+    stem = os.path.splitext(basename)[0]
+    if stem in _CONTRACT_NAME_STEMS:
+        return True
+
+    # Check __init__.py that re-exports from submodules
+    if basename == "__init__.py" and result is not None:
+        if result.imports and result.exports:
+            return True
+
     # Access node attributes via getattr for the frozen FileNode
     fan_in = getattr(node, "fan_in", 0)
     fan_out = getattr(node, "fan_out", 0)
@@ -506,6 +617,31 @@ def _interleave_test_files(
             result.append(test_path)
 
     return result
+
+
+def _separate_test_files(
+    *,
+    sorted_order: list[str],
+    pass_assignments: dict[str, ReadingPass],
+    graph: DependencyGraph,
+    classification: LayerClassification,
+) -> list[str]:
+    """Place all test files after all non-test files (separate pass mode).
+
+    Non-test files appear in their normal topological order across all
+    three passes. Test files are then appended in topological order.
+    """
+    non_test = [p for p in sorted_order if not detect_test_file(p)]
+    test_files = sorted(
+        p for p in pass_assignments if detect_test_file(p)
+    )
+    # Sort test files topologically for determinism
+    sorted_tests = _topological_sort(
+        files=test_files,
+        graph=graph,
+        classification=classification,
+    )
+    return non_test + sorted_tests
 
 
 # ---------------------------------------------------------------------------
