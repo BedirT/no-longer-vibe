@@ -4,6 +4,8 @@ import { CallerCountProvider } from "./callerCount";
 import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
+import { openFile } from "./fileOpener";
+import { HighlightManager } from "./highlightManager";
 import { getSocketPath } from "./ipcProtocol";
 import { IpcBridgeServer } from "./ipcServer";
 import { createMcpServer } from "./mcpServer";
@@ -118,6 +120,26 @@ export async function activate(
     for (const d of blastRadiusMcpDisposables) {
       context.subscriptions.push(d);
     }
+
+    // Wire open_file events to actually open the file in the editor
+    const openFileSub = toolEvents.event((event) => {
+      if (event.tool === "open_file" && typeof event.params.path === "string") {
+        const filePath = event.params.path;
+        const absolutePath = filePath.startsWith("/")
+          ? filePath
+          : `${workspaceRoot}/${filePath}`;
+        const line =
+          typeof event.params.line === "number"
+            ? event.params.line
+            : undefined;
+        openFile(absolutePath, line);
+      }
+    });
+    context.subscriptions.push(openFileSub);
+
+    // Set up highlight manager for highlight_range, clear_highlights, clear_all
+    const highlightManager = new HighlightManager(toolEvents.event);
+    context.subscriptions.push({ dispose: () => highlightManager.dispose() });
 
     // Wire MCP set_codelens events to the CodeLens provider
     const codeLensMcpSub = toolEvents.event((event) => {

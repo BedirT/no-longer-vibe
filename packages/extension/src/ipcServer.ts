@@ -31,6 +31,8 @@ const ALLOWED_TOOLS = new Set([
   "highlight_range",
   "clear_highlights",
   "open_file",
+  "mark_read",
+  "mark_flagged",
   "set_codelens",
   "show_blast_radius",
   "clear_blast_radius",
