@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-63",
+  "current_issue": "BED-77",
   "features": [
     {
       "issue": "BED-72",
@@ -29,22 +29,32 @@
     {
       "issue": "BED-73",
       "title": "progress.json management — create, read, update, stats",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/5",
       "branch": "feat/bed-73-progress-json"
     },
     {
       "issue": "BED-69",
       "title": "Content hashing — SHA-256 for staleness detection",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/6",
       "branch": "feat/bed-69-content-hashing"
     },
     {
       "issue": "BED-63",
       "title": "Python language plugin — ast module + import resolution",
-      "status": "in-progress",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/8",
       "branch": "feat/bed-63-python-language-plugin"
+    },
+    {
+      "issue": "BED-77",
+      "title": "/read-flagged command — second pass through flagged files",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/11",
+      "branch": "feat/bed-77-read-flagged"
     }
   ],
   "blockers": [],
-  "next_action": "BED-63 PR needs to be created and merged."
+  "next_action": "BED-77 complete. Pick next unblocked issue."
 }
