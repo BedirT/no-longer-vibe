@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-62",
+  "current_issue": null,
   "features": [
     {
       "issue": "BED-72",
@@ -24,8 +24,14 @@
       "title": "Language plugin architecture — interface for multi-language AST parsing",
       "status": "pr-open",
       "branch": "feat/bed-62-language-plugin-architecture"
+    },
+    {
+      "issue": "BED-73",
+      "title": "progress.json management — create, read, update, stats",
+      "status": "pr-open",
+      "branch": "feat/bed-73-progress-json"
     }
   ],
   "blockers": [],
-  "next_action": "BED-63 (Python language plugin) is next — blocked by BED-62"
+  "next_action": "BED-63 (Python language plugin) is next — blocked by BED-62. BED-73 unblocks BED-75, BED-76, BED-82."
 }
