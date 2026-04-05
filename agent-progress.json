@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-69",
+  "current_issue": "BED-63",
   "features": [
     {
       "issue": "BED-72",
@@ -22,7 +22,8 @@
     {
       "issue": "BED-62",
       "title": "Language plugin architecture — interface for multi-language AST parsing",
-      "status": "pr-open",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/4",
       "branch": "feat/bed-62-language-plugin-architecture"
     },
     {
@@ -36,8 +37,14 @@
       "title": "Content hashing — SHA-256 for staleness detection",
       "status": "pr-open",
       "branch": "feat/bed-69-content-hashing"
+    },
+    {
+      "issue": "BED-63",
+      "title": "Python language plugin — ast module + import resolution",
+      "status": "in-progress",
+      "branch": "feat/bed-63-python-language-plugin"
     }
   ],
   "blockers": [],
-  "next_action": "BED-63 (Python language plugin) is next — blocked by BED-62. BED-73 unblocks BED-75, BED-76, BED-82."
+  "next_action": "BED-63 PR needs to be created and merged."
 }
