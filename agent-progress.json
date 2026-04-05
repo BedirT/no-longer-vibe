@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-05",
   "current_milestone": "Phase 1: Core",
-  "current_issue": "BED-61",
+  "current_issue": "BED-62",
   "features": [
     {
       "issue": "BED-72",
@@ -15,11 +15,17 @@
     {
       "issue": "BED-61",
       "title": "File tree walker — .gitignore-aware source file collection",
-      "status": "pr-open",
+      "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/3",
       "branch": "feat/bed-61-file-tree-walker"
+    },
+    {
+      "issue": "BED-62",
+      "title": "Language plugin architecture — interface for multi-language AST parsing",
+      "status": "pr-open",
+      "branch": "feat/bed-62-language-plugin-architecture"
     }
   ],
   "blockers": [],
-  "next_action": "BED-62 (language plugin architecture) is next unblocked issue after BED-61"
+  "next_action": "BED-63 (Python language plugin) is next — blocked by BED-62"
 }
