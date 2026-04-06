@@ -7,6 +7,7 @@ export interface ProgressFileEntry {
   read_at: string;
   note?: string | null;
   summary?: string | null;
+  exports_read?: Record<string, { read_at: string; summary?: string | null }>;
 }
 
 /** Stats summary from progress.json. */
