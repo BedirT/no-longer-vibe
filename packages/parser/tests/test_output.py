@@ -775,7 +775,9 @@ class TestSymbolUsageInOutput:
             cycles=(),
             symbol_usage={
                 "x.py": {
-                    "func": SymbolUsageEntry(callers=3, used_by=("a.py", "b.py", "c.py")),
+                    "func": SymbolUsageEntry(
+                        callers=3, used_by=("a.py", "b.py", "c.py"),
+                    ),
                 },
             },
         )

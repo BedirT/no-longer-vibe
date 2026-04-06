@@ -94,7 +94,7 @@ class DependencyGraph:
     external_deps: tuple[ExternalDep, ...]
     cycles: tuple[tuple[str, ...], ...]
     symbol_usage: dict[str, dict[str, SymbolUsageEntry]] = field(
-        default_factory=dict,
+        default_factory=lambda: {},
     )
 
 
@@ -381,7 +381,7 @@ def _compute_symbol_usage(
                     usage_map[resolved][spec].add(from_file)
 
     # Convert to frozen SymbolUsageEntry
-    result: dict[str, dict[str, SymbolUsageEntry]] = {}
+    output: dict[str, dict[str, SymbolUsageEntry]] = {}
     for path in sorted(parse_results):
         entries: dict[str, SymbolUsageEntry] = {}
         for name in sorted(usage_map.get(path, {})):
@@ -390,9 +390,9 @@ def _compute_symbol_usage(
                 callers=len(users),
                 used_by=tuple(sorted(users)),
             )
-        result[path] = entries
+        output[path] = entries
 
-    return result
+    return output
 
 
 # ---------------------------------------------------------------------------

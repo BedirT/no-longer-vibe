@@ -586,6 +586,17 @@ describe("HighlightManager", () => {
       expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.07)");
     });
 
+    it("uses important tier at exact boundary 0.5", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 0.5 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.07)");
+    });
+
     it("uses standard tier at exact boundary 0.25", () => {
       __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
       toolEvents.fire({
