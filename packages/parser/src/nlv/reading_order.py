@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from nlv.config import (
     ReadingConfig,
     TestFileMode,
+    is_excluded,
     match_custom_pass_override,
 )
 from nlv.graph import DependencyGraph
@@ -164,6 +165,22 @@ def compute_reading_order(
         return ()
 
     all_files = set(graph.nodes)
+
+    # Remove files matching exclude_from_reading patterns
+    if config.exclude_from_reading:
+        excluded = {f for f in all_files if is_excluded(f, config)}
+        if excluded:
+            logger.debug("Excluding %d file(s) from reading order", len(excluded))
+            all_files -= excluded
+            # Build a filtered graph view with excluded nodes removed
+            graph = _filter_graph(graph, all_files)
+            parse_results = {
+                k: v for k, v in parse_results.items() if k in all_files
+            }
+            classification = _filter_classification(
+                classification, all_files,
+            )
+
     test_pairs = find_paired_test_files(all_files)
 
     # Handle skip_tests / test_pass=skip: exclude test files entirely
@@ -726,6 +743,65 @@ def _build_reason(
         parts.append(f"Utility code ({layer.value} layer).")
 
     return " ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Exclusion filtering helpers
+# ---------------------------------------------------------------------------
+
+
+def _filter_graph(
+    graph: DependencyGraph,
+    keep: set[str],
+) -> DependencyGraph:
+    """Return a DependencyGraph with only nodes in *keep*."""
+    from nlv.graph import FileNode
+
+    filtered_nodes: dict[str, FileNode] = {}
+    for path, node in graph.nodes.items():
+        if path not in keep:
+            continue
+        filtered_nodes[path] = FileNode(
+            path=node.path,
+            imports=tuple(i for i in node.imports if i in keep),
+            imported_by=tuple(i for i in node.imported_by if i in keep),
+            fan_in=sum(1 for i in node.imported_by if i in keep),
+            fan_out=sum(1 for i in node.imports if i in keep),
+            depth=node.depth,
+            is_leaf=all(i not in keep for i in node.imported_by),
+            is_root=all(i not in keep for i in node.imports),
+        )
+
+    filtered_symbol_usage = {
+        p: v for p, v in graph.symbol_usage.items() if p in keep
+    }
+
+    return DependencyGraph(
+        nodes=filtered_nodes,
+        external_deps=graph.external_deps,
+        cycles=tuple(
+            c for c in graph.cycles if all(f in keep for f in c)
+        ),
+        symbol_usage=filtered_symbol_usage,
+    )
+
+
+def _filter_classification(
+    classification: LayerClassification,
+    keep: set[str],
+) -> LayerClassification:
+    """Return a LayerClassification with only files in *keep*."""
+
+    filtered_layers = {
+        p: layer for p, layer in classification.layers.items() if p in keep
+    }
+    filtered_groups: dict[Layer, tuple[str, ...]] = {}
+    for layer, paths in classification.layer_groups.items():
+        filtered_groups[layer] = tuple(p for p in paths if p in keep)
+    return LayerClassification(
+        layers=filtered_layers,
+        layer_groups=filtered_groups,
+    )
 
 
 # ---------------------------------------------------------------------------
