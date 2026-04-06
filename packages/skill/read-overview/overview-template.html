@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} -- Codebase Overview</title>
+<style>
+  :root {
+    --c-foundation: #4CA1A3;
+    --c-core: #6B7B8D;
+    --c-features: #D4A057;
+    --c-integration: #C07070;
+    --c-entry: #8E99A4;
+    --c-pass1: #5B8FBF;
+    --c-pass2: #D4A057;
+    --c-pass3: #7BA37B;
+    --c-bg: #ffffff;
+    --c-bg-alt: #f7f6f4;
+    --c-bg-dark: #1a1a1a;
+    --c-text: #1a1a1a;
+    --c-text-muted: #666666;
+    --c-text-light: #999999;
+    --c-border: #e5e5e5;
+    --c-card: #ffffff;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+    --max-w: 960px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --c-bg: #111111;
+      --c-bg-alt: #1a1917;
+      --c-bg-dark: #0a0a0a;
+      --c-text: #e5e5e5;
+      --c-text-muted: #a0a0a0;
+      --c-text-light: #707070;
+      --c-border: #2a2a2a;
+      --c-card: #1c1c1c;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--c-text);
+    background: var(--c-bg);
+    line-height: 1.5;
+  }
+  code, .mono { font-family: var(--font-mono); font-size: 0.875em; }
+
+  /* ── Zone 1: Identity ─────────────────────────────── */
+  .identity {
+    background: var(--c-bg-alt);
+    padding: 48px 24px 40px;
+  }
+  .identity-inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+  }
+  .project-name {
+    font-size: 32px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+  .project-desc {
+    font-size: 16px;
+    color: var(--c-text-muted);
+    margin-bottom: 20px;
+    max-width: 640px;
+  }
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--c-border);
+    color: var(--c-text);
+  }
+  .stat-badge .num {
+    font-weight: 700;
+    font-family: var(--font-mono);
+  }
+
+  /* ── Zone 2: The Map ──────────────────────────────── */
+  .map-section {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 48px 24px;
+  }
+  .section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--c-text);
+  }
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--c-text-muted);
+    margin-bottom: 24px;
+  }
+
+  /* Layer bar */
+  .layer-bar-container { margin-bottom: 32px; }
+  .layer-bar {
+    width: 100%;
+    height: 44px;
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    cursor: default;
+  }
+  .layer-bar-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    transition: opacity 0.15s;
+    position: relative;
+    min-width: 2%;
+  }
+  .layer-bar-seg:hover { opacity: 0.85; }
+  .layer-bar-seg .seg-label { pointer-events: none; }
+  .layer-bar-seg .seg-label.hidden { display: none; }
+
+  /* Layer detail table */
+  .layer-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+  .layer-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--c-text-muted);
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--c-border);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .layer-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--c-border);
+    vertical-align: top;
+  }
+  .layer-table tr:last-child td { border-bottom: none; }
+  .layer-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  .layer-name { font-weight: 500; }
+  .layer-count { font-family: var(--font-mono); font-weight: 600; }
+
+  /* Two-column layout for features + backbone */
+  .map-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 40px;
+  }
+  @media (max-width: 720px) {
+    .map-columns { grid-template-columns: 1fr; }
+  }
+
+  /* Feature area cards */
+  .feature-cards { display: flex; flex-direction: column; gap: 12px; }
+  .feature-card {
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    border-left: 4px solid var(--c-text-light);
+  }
+  .feature-card-name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .feature-card-meta {
+    font-size: 13px;
+    color: var(--c-text-muted);
+    margin-bottom: 6px;
+  }
+  .feature-card-files {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--c-text-muted);
+  }
+  .feature-card .layer-dots {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .feature-card .layer-dots .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Backbone */
+  .backbone-list { display: flex; flex-direction: column; gap: 10px; }
+  .backbone-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .backbone-bar-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .backbone-file {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--c-text);
+    cursor: pointer;
+  }
+  .backbone-file:hover { text-decoration: underline; }
+  .backbone-bar-wrap {
+    flex: 1;
+    height: 20px;
+    background: var(--c-border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .backbone-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .backbone-dep-count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 48px;
+    text-align: right;
+    color: var(--c-text-muted);
+  }
+  .backbone-desc {
+    font-size: 12px;
+    color: var(--c-text-muted);
+    margin-top: 2px;
+    margin-left: 12px;
+  }
+
+  /* ── Zone 3: Your Path ────────────────────────────── */
+  .path-section {
+    background: var(--c-bg-alt);
+    padding: 48px 24px 56px;
+  }
+  .path-inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+  }
+
+  /* Journey track */
+  .journey-track-wrap { margin-bottom: 32px; }
+  .journey-track {
+    width: 100%;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+  }
+  .journey-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    position: relative;
+    transition: opacity 0.15s;
+  }
+  .journey-seg:hover { opacity: 0.85; }
+  .journey-labels {
+    display: flex;
+    margin-top: 8px;
+  }
+  .journey-label {
+    font-size: 11px;
+    color: var(--c-text-muted);
+    text-align: center;
+  }
+
+  /* Session markers */
+  .session-markers {
+    display: flex;
+    align-items: flex-start;
+    margin-top: 6px;
+    position: relative;
+    height: 24px;
+  }
+  .session-marker {
+    font-size: 10px;
+    color: var(--c-text-light);
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+
+  /* Milestones */
+  .milestones {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    gap: 16px;
+  }
+  .milestone {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    color: var(--c-text-muted);
+    font-style: italic;
+    border-top: 2px dashed var(--c-border);
+    padding-top: 8px;
+  }
+  .milestone strong {
+    display: block;
+    font-style: normal;
+    color: var(--c-text);
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  /* First files */
+  .first-files {
+    margin-top: 32px;
+  }
+  .first-files-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .first-file {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .first-file:last-child { border-bottom: none; }
+  .first-file-num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--c-text-light);
+    min-width: 24px;
+  }
+  .first-file-path {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .first-file-path:hover { text-decoration: underline; }
+  .first-file-reason {
+    font-size: 13px;
+    color: var(--c-text-muted);
+  }
+
+  /* Heads up */
+  .heads-up {
+    margin-top: 24px;
+    padding: 16px 20px;
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--c-text-muted);
+    line-height: 1.6;
+  }
+
+  /* CTA */
+  .cta {
+    margin-top: 32px;
+    background: var(--c-bg-dark);
+    color: #e5e5e5;
+    padding: 16px 24px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    text-align: center;
+  }
+  .cta span { color: #7BA37B; }
+
+  /* Footer */
+  .footer {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: 24px;
+    font-size: 12px;
+    color: var(--c-text-light);
+    text-align: center;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    pointer-events: none;
+    z-index: 100;
+    max-width: 300px;
+    display: none;
+    line-height: 1.4;
+  }
+  .tooltip-title { font-weight: 600; margin-bottom: 2px; }
+  .tooltip-body { color: var(--c-text-muted); }
+</style>
+</head>
+<body>
+
+<!-- ── Zone 1: Identity ─────────────────────────────── -->
+<div class="identity">
+  <div class="identity-inner">
+    <div class="project-name">{{PROJECT_NAME}}</div>
+    <div class="project-desc">{{PROJECT_DESCRIPTION}}</div>
+    <div class="stat-row">
+      <span class="stat-badge"><span class="num">{{TOTAL_FILES}}</span> files</span>
+      <span class="stat-badge">~<span class="num">{{TOTAL_LINES}}</span> lines</span>
+      <span class="stat-badge">{{LANGUAGE}}</span>
+      <span class="stat-badge">{{FRAMEWORK}}</span>
+      <span class="stat-badge">{{PACKAGE_MANAGER}}</span>
+      <!-- {{KEY_DEPS_BADGES}} -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Zone 2: The Map ──────────────────────────────── -->
+<div class="map-section">
+  <div class="section-title">Layers</div>
+  <div class="section-subtitle">Horizontal structure -- how the code is organized by dependency depth</div>
+
+  <!-- Layer composition bar -->
+  <div class="layer-bar-container">
+    <div class="layer-bar">
+      <!-- Each segment: width is percentage of total files -->
+      <!-- {{LAYER_BAR_SEGMENTS}} -->
+    </div>
+  </div>
+
+  <!-- Layer detail table -->
+  <table class="layer-table">
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>Files</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- {{LAYER_TABLE_ROWS}} -->
+    </tbody>
+  </table>
+
+  <!-- Two-column: Feature Areas + Backbone -->
+  <div class="map-columns">
+    <div>
+      <div class="section-title">Feature Areas</div>
+      <div class="section-subtitle">Vertical slices -- what the app does</div>
+      <div class="feature-cards">
+        <!-- {{FEATURE_AREA_CARDS}} -->
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Backbone</div>
+      <div class="section-subtitle">Everything connects through these files</div>
+      <div class="backbone-list">
+        <!-- {{BACKBONE_ITEMS}} -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Zone 3: Your Path ────────────────────────────── -->
+<div class="path-section">
+  <div class="path-inner">
+    <div class="section-title">Your Reading Path</div>
+    <div class="section-subtitle">3 passes, ~{{ESTIMATED_SESSIONS}} sessions at 35 files each</div>
+
+    <!-- Journey track -->
+    <div class="journey-track-wrap">
+      <div class="journey-track">
+        <!-- {{JOURNEY_SEGMENTS}} -->
+      </div>
+      <div class="journey-labels">
+        <!-- {{JOURNEY_LABELS}} -->
+      </div>
+      <div class="milestones">
+        <!-- {{MILESTONES}} -->
+      </div>
+    </div>
+
+    <!-- First files -->
+    <div class="first-files">
+      <div class="first-files-title">Starting with</div>
+      <!-- {{FIRST_FILES}} -->
+    </div>
+
+    <!-- Heads up -->
+    <!-- {{HEADS_UP}} -->
+
+    <!-- CTA -->
+    <div class="cta">
+      <span>$</span> /read-next to begin reading
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Generated by No Longer Vibe on {{GENERATED_AT}}
+</div>
+
+<!-- Shared tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div class="tooltip-body" id="tooltip-body"></div>
+</div>
+
+<script>
+// ── Tooltip ──────────────────────────────────────────
+const tip = document.getElementById('tooltip');
+const tipTitle = document.getElementById('tooltip-title');
+const tipBody = document.getElementById('tooltip-body');
+
+document.addEventListener('mousemove', e => {
+  if (tip.style.display === 'block') {
+    tip.style.left = Math.min(e.clientX + 12, window.innerWidth - 320) + 'px';
+    tip.style.top = (e.clientY - tip.offsetHeight - 8) + 'px';
+  }
+});
+
+function showTip(title, body) {
+  tipTitle.textContent = title;
+  tipBody.textContent = body;
+  tip.style.display = 'block';
+}
+function hideTip() { tip.style.display = 'none'; }
+
+// Attach to all elements with data-tip-title
+document.querySelectorAll('[data-tip-title]').forEach(el => {
+  el.addEventListener('mouseenter', () =>
+    showTip(el.dataset.tipTitle, el.dataset.tipBody || ''));
+  el.addEventListener('mouseleave', hideTip);
+});
+
+// ── Click to copy file paths ─────────────────────────
+document.querySelectorAll('.backbone-file, .first-file-path').forEach(el => {
+  el.addEventListener('click', () => {
+    navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+      const orig = el.textContent;
+      el.textContent = 'Copied!';
+      setTimeout(() => { el.textContent = orig; }, 1000);
+    });
+  });
+});
+</script>
+
+<!--
+  TEMPLATE USAGE:
+  Claude generates this HTML by replacing all {{PLACEHOLDER}} tokens
+  with actual data from map.json and subagent results. The comment
+  blocks (LAYER_BAR_SEGMENTS, FEATURE_AREA_CARDS, etc.) are replaced
+  with actual HTML elements.
+
+  Example layer bar segment:
+    <div class="layer-bar-seg" style="width:24.7%;background:var(--c-foundation)"
+         data-tip-title="foundation -- 117 files (24.7%)"
+         data-tip-body="No or minimal internal dependencies">
+      <span class="seg-label">foundation 117</span>
+    </div>
+
+  Example layer table row:
+    <tr>
+      <td><span class="layer-dot" style="background:var(--c-foundation)"></span>
+          <span class="layer-name">foundation</span></td>
+      <td><span class="layer-count">117</span></td>
+      <td>domain value objects, token primitives, enums</td>
+    </tr>
+
+  Example feature card:
+    <div class="feature-card" style="border-left-color:var(--c-features)">
+      <div class="feature-card-name">Token Catalog
+        <span class="layer-dots">
+          <span class="dot" style="background:var(--c-foundation)"></span>
+          <span class="dot" style="background:var(--c-features)"></span>
+        </span>
+      </div>
+      <div class="feature-card-meta">~60 files across foundation, features</div>
+      <div class="feature-card-files">tokens.py, token_catalog/models.py, token_ids.py</div>
+    </div>
+
+  Example backbone item:
+    <div>
+      <div class="backbone-item">
+        <div class="backbone-bar-container">
+          <span class="backbone-file" title="Click to copy">context.py</span>
+          <div class="backbone-bar-wrap">
+            <div class="backbone-bar-fill" style="width:100%;background:var(--c-foundation)"></div>
+          </div>
+        </div>
+        <span class="backbone-dep-count">49 deps</span>
+      </div>
+      <div class="backbone-desc">Immutable execution scope: workflow_id + session_id</div>
+    </div>
+
+  Example journey segment:
+    <div class="journey-seg" style="flex-grow:182;background:var(--c-pass1)"
+         data-tip-title="Pass 1: Contracts -- 182 files"
+         data-tip-body="Types, interfaces, public APIs">
+      Contracts (182)
+    </div>
+
+  Example journey label:
+    <div class="journey-label" style="flex-grow:182">contracts</div>
+
+  Example milestone:
+    <div class="milestone">
+      <strong>After session 5</strong>
+      All type definitions and contracts read
+    </div>
+
+  Example first file:
+    <div class="first-file">
+      <span class="first-file-num">1.</span>
+      <span class="first-file-path">domain/value_objects/context.py</span>
+      <span class="first-file-reason">Root value object, 49 dependents</span>
+    </div>
+
+  Example heads-up:
+    <div class="heads-up">
+      Sessions 1-3 are the densest -- 117 foundation files define the
+      vocabulary for everything else. The features layer is 48% of all
+      files, so expect sessions 4-9 to be the widest stretch.
+    </div>
+-->
+</body>
+</html>
