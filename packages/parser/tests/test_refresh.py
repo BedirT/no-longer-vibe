@@ -511,6 +511,7 @@ class TestRefreshResult:
         assert result.removed == 0
         assert result.unchanged == 1
         assert result.transitively_invalidated == 0
+        assert result.pruned == 0
 
     def test_full_result(self, tmp_path: Path) -> None:
         guide_dir = tmp_path / ".codebase-guide"
@@ -552,6 +553,7 @@ class TestRefreshResult:
         assert result.removed == 1  # b.py
         assert result.unchanged == 1  # c.py (was unchanged)
         assert result.transitively_invalidated == 1  # c.py (depends on a.py)
+        assert result.pruned == 0
 
 
 # ---------------------------------------------------------------------------
@@ -671,6 +673,92 @@ class TestRefreshEdgeCases:
         # b.py was already flagged, should still be flagged with stale note
         assert data["files"]["b.py"]["status"] == "flagged"
         assert "dependency changed" in data["files"]["b.py"]["note"].lower()
+
+
+class TestRefreshPrunesExcludedFiles:
+    """Files in content_hashes but not in reading_order get pruned."""
+
+    def test_files_not_in_reading_order_pruned_from_progress(
+        self, tmp_path: Path,
+    ) -> None:
+        """Files present in content_hashes but absent from reading_order
+        should be removed from progress.json (e.g. trivial __init__.py)."""
+        guide_dir = tmp_path / ".codebase-guide"
+        # Old map has both files in reading_order and content_hashes
+        old_files = ["a.py", "__init__.py"]
+        old_map = _make_map_data(old_files)
+        _setup_progress(guide_dir, old_map)
+
+        # New map: __init__.py still in content_hashes but NOT in reading_order
+        new_hashes = dict(old_map["content_hashes"])
+        new_map = _make_map_data(["a.py"], hashes=new_hashes)
+        # Manually add __init__.py to content_hashes only (not reading_order)
+        new_map["content_hashes"]["__init__.py"] = new_hashes["__init__.py"]
+        new_hash = _write_map(guide_dir, new_map)
+
+        result = refresh_progress(
+            guide_dir, new_map, new_hash,
+            old_content_hashes=old_map["content_hashes"],
+        )
+
+        mgr = ProgressManager(guide_dir)
+        data = mgr.load()
+        assert "__init__.py" not in data["files"]
+        assert "a.py" in data["files"]
+        assert result.pruned == 1
+
+    def test_pruned_files_not_counted_in_stats(
+        self, tmp_path: Path,
+    ) -> None:
+        """Stats should not count pruned files."""
+        guide_dir = tmp_path / ".codebase-guide"
+        old_files = ["a.py", "__init__.py", "tests/__init__.py"]
+        old_map = _make_map_data(old_files)
+        _setup_progress(guide_dir, old_map, confirmed=["a.py"])
+
+        new_hashes = dict(old_map["content_hashes"])
+        new_map = _make_map_data(["a.py"], hashes=new_hashes)
+        new_map["content_hashes"]["__init__.py"] = new_hashes["__init__.py"]
+        new_map["content_hashes"]["tests/__init__.py"] = new_hashes["tests/__init__.py"]
+        new_hash = _write_map(guide_dir, new_map)
+
+        refresh_progress(
+            guide_dir, new_map, new_hash,
+            old_content_hashes=old_map["content_hashes"],
+        )
+
+        mgr = ProgressManager(guide_dir)
+        data = mgr.load()
+        assert data["stats"]["total"] == 1
+        assert data["stats"]["confirmed"] == 1
+        assert data["stats"]["unread"] == 0
+
+    def test_confirmed_excluded_files_still_pruned(
+        self, tmp_path: Path,
+    ) -> None:
+        """Even confirmed files get pruned if not in reading_order."""
+        guide_dir = tmp_path / ".codebase-guide"
+        old_files = ["a.py", "__init__.py"]
+        old_map = _make_map_data(old_files)
+        _setup_progress(
+            guide_dir, old_map,
+            confirmed=["a.py", "__init__.py"],
+        )
+
+        new_hashes = dict(old_map["content_hashes"])
+        new_map = _make_map_data(["a.py"], hashes=new_hashes)
+        new_map["content_hashes"]["__init__.py"] = new_hashes["__init__.py"]
+        new_hash = _write_map(guide_dir, new_map)
+
+        result = refresh_progress(
+            guide_dir, new_map, new_hash,
+            old_content_hashes=old_map["content_hashes"],
+        )
+
+        mgr = ProgressManager(guide_dir)
+        data = mgr.load()
+        assert "__init__.py" not in data["files"]
+        assert result.pruned == 1
 
 
 class TestRefreshPreservesExistingProgress:
