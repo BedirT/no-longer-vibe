@@ -124,6 +124,14 @@ def run_index(root: Path) -> IndexResult:
         config=config,
     )
 
+    # Filter classification to only include files in reading order.
+    # The reading order excludes trivial __init__.py and config-excluded
+    # files; the layers section in map.json must be consistent with that.
+    reading_order_paths = {entry.path for entry in reading_order}
+    classification = _filter_classification_to_reading_order(
+        classification, reading_order_paths,
+    )
+
     # Compute content hashes
     file_paths = [root / sf.path for sf in source_files]
     content_hashes = compute_content_hashes(file_paths, root=root)
@@ -324,6 +332,30 @@ def _init_progress(
     else:
         mgr = ProgressManager(guide_dir)
         mgr.create(map_data, map_hash)
+
+
+def _filter_classification_to_reading_order(
+    classification: LayerClassification,
+    reading_order_paths: set[str],
+) -> LayerClassification:
+    """Return a classification with only files present in the reading order.
+
+    Files excluded from the reading order (trivial __init__.py,
+    config-excluded patterns) must also be removed from the layer
+    groups so that map.json layers are consistent with reading_order.
+    """
+    filtered_layers = {
+        k: v for k, v in classification.layers.items()
+        if k in reading_order_paths
+    }
+    filtered_groups = {
+        layer: tuple(f for f in files if f in reading_order_paths)
+        for layer, files in classification.layer_groups.items()
+    }
+    return LayerClassification(
+        layers=filtered_layers,
+        layer_groups=filtered_groups,
+    )
 
 
 def _count_layers(
