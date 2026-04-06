@@ -14,61 +14,50 @@ noted when they originally flagged each file.
 
 - `.codebase-guide/progress.json` must exist with at least one flagged
   file
+- The `no-longer-vibe` MCP server must be connected
 
 ## Behavior
 
-1. Load `map.json` and `progress.json`.
-2. Collect all files with status `flagged`, ordered by their position
-   in the original reading order.
-3. For each flagged file, display:
+1. Call the `get_flagged_files` MCP tool (no parameters).
+2. If the result has `"status": "none_flagged"`, tell the user:
+   "No flagged files. All clear."
+3. If the result has `"status": "error"`, display the error message.
+4. Display the list of flagged files with a summary count:
+   "Found <n> flagged files for second pass."
+5. For each flagged file, display:
    ```
-   -- Flagged: <filepath> -----------------------------
-   Layer: <layer> | Lines: <n>
-   Original note: "<the note from when it was flagged>"
-   Original summary: "<the summary from first read>"
+   -- Flagged: <path> -----------------------------
+   Layer: <layer> | Lines: <line_count>
+   Original note: "<note>"
+   Original summary: "<summary>"
    --------------------------------------------------
    ```
-4. Read the file content into the conversation.
-5. The user reviews and either:
-   - `confirmed` -> update status to `confirmed`, clear the flag
-   - `flag <new_reason>` -> keep flagged with updated note
-   - `skim` / `skimmed` -> mark as `skimmed`
+6. Read the file content into the conversation.
+7. The user reviews and either:
+   - `confirmed` -> call `complete_file` with `status: "confirmed"`
+     and an updated summary
+   - `flag <new_reason>` -> call `complete_file` with
+     `status: "flagged"` and `note: <new_reason>`
+   - `skim` / `skimmed` -> call `complete_file` with
+     `status: "skimmed"`
    - Ask questions -> answer and wait
-6. Update `progress.json` atomically after each change.
-7. Continue to the next flagged file until all are resolved.
+8. Continue to the next flagged file until all are resolved.
+
+## IMPORTANT: Do NOT Read JSON Files Directly
+
+Do NOT read `.codebase-guide/map.json` or `.codebase-guide/progress.json`
+into the conversation. All data comes from MCP tools:
+- `get_flagged_files` for the flagged file list
+- `complete_file` for status updates
 
 ## VS Code Extension Integration (MCP Tools)
 
-When the No Longer Vibe VS Code extension is connected, use MCP tools
-to enhance the flagged-file review. **Always check if tools are
-available before calling them** — the skill must work without MCP.
+When visual MCP tools are available:
 
-### MCP-Enhanced Flow
-
-When MCP tools are available:
-
-1. **Open the flagged file** after displaying the briefing:
-   - Call `open_file` with the file path.
-
-2. **Highlight the relevant section** if the original note references
-   specific lines or functions:
-   - Call `highlight_range` with style `"warning"` on the flagged area.
-
-3. **Update decorations** on resolution:
-   - On `confirmed`: call `mark_read` with the file path, then
-     `clear_highlights` for that file.
-   - On `flag <new_reason>`: call `mark_flagged` with the file path
-     and updated reason, then `clear_highlights`.
-   - On `skim` / `skimmed`: call `clear_highlights` for that file.
-
-4. **Clear highlights** before moving to the next flagged file.
-
-### Fallback Without MCP
-
-When MCP tools are not available, the skill works in text-only mode.
-Briefings are displayed inline, file content is read into the
-conversation, and progress is tracked via `progress.json`. No errors
-are shown when MCP tools are absent.
+1. **Open the flagged file**: call `open_file` with the file path.
+2. **Highlight flagged area**: call `highlight_range` with
+   style `"warning"` if the note references specific lines.
+3. **Clear highlights** on resolution and before the next file.
 
 ## Edge Cases
 
