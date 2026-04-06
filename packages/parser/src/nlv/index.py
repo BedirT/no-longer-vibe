@@ -38,11 +38,11 @@ from nlv.plugins.go import GoPlugin
 from nlv.plugins.python import PythonPlugin
 from nlv.plugins.typescript import TypeScriptPlugin
 from nlv.progress import ProgressManager
-from nlv.refresh import RefreshResult, refresh_progress
 from nlv.reading_order import (
     ReadingOrderEntry,
     compute_reading_order,
 )
+from nlv.refresh import refresh_progress
 from nlv.walker import SourceFile, walk_tree
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,6 @@ def run_index(root: Path) -> IndexResult:
     content_hashes = compute_content_hashes(file_paths, root=root)
 
     # Capture old content hashes before overwriting map.json
-    guide_dir = root / _GUIDE_DIR_NAME
     old_content_hashes = _read_old_content_hashes(guide_dir)
 
     # Write map.json

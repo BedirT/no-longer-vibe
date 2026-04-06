@@ -12,7 +12,12 @@ from typing import Any
 
 import pytest
 
-from nlv.index import IndexResult, format_summary, run_index
+from nlv.index import (
+    IndexResult,
+    _read_old_content_hashes,
+    format_summary,
+    run_index,
+)
 from nlv.layers import Layer
 from nlv.progress import FileStatus, ProgressManager
 
@@ -286,6 +291,12 @@ class TestProgressInit:
         new_progress = _read_progress(tmp_path)
         # The modified file should be reset to unread
         assert new_progress["files"]["src/config.py"]["status"] == "unread"
+        # At least one unchanged file should remain confirmed
+        unchanged_statuses = [
+            v["status"] for k, v in new_progress["files"].items()
+            if k != "src/config.py"
+        ]
+        assert "confirmed" in unchanged_statuses
 
     def test_re_index_does_not_error(self, tmp_path: Path) -> None:
         """Re-running index on the same project does not raise."""
@@ -380,3 +391,41 @@ class TestErrorHandling:
         result = run_index(tmp_path)
         # Should still index at least the good file
         assert result.total_files >= 1
+
+
+# ---------------------------------------------------------------------------
+# _read_old_content_hashes
+# ---------------------------------------------------------------------------
+
+
+class TestReadOldContentHashes:
+    """Tests for _read_old_content_hashes helper (BED-102)."""
+
+    def test_returns_empty_when_no_map_json(self, tmp_path: Path) -> None:
+        """Returns empty dict when .codebase-guide/map.json does not exist."""
+        guide_dir = tmp_path / ".codebase-guide"
+        guide_dir.mkdir()
+        assert _read_old_content_hashes(guide_dir) == {}
+
+    def test_returns_hashes_from_valid_map(self, tmp_path: Path) -> None:
+        """Returns content_hashes from a valid map.json."""
+        guide_dir = tmp_path / ".codebase-guide"
+        guide_dir.mkdir()
+        hashes = {"src/a.py": "abc123", "src/b.py": "def456"}
+        map_data: dict[str, Any] = {"content_hashes": hashes}
+        (guide_dir / "map.json").write_text(json.dumps(map_data))
+        assert _read_old_content_hashes(guide_dir) == hashes
+
+    def test_returns_empty_on_corrupt_json(self, tmp_path: Path) -> None:
+        """Returns empty dict when map.json contains invalid JSON."""
+        guide_dir = tmp_path / ".codebase-guide"
+        guide_dir.mkdir()
+        (guide_dir / "map.json").write_text("{not valid json")
+        assert _read_old_content_hashes(guide_dir) == {}
+
+    def test_returns_empty_when_no_hashes_key(self, tmp_path: Path) -> None:
+        """Returns empty dict when map.json lacks content_hashes key."""
+        guide_dir = tmp_path / ".codebase-guide"
+        guide_dir.mkdir()
+        (guide_dir / "map.json").write_text(json.dumps({"version": "1.0.0"}))
+        assert _read_old_content_hashes(guide_dir) == {}
