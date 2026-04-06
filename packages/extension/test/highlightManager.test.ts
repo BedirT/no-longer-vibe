@@ -29,7 +29,8 @@ describe("HighlightManager", () => {
   describe("initialization", () => {
     it("creates decoration types for all four styles on construction", () => {
       const types = __getDecorationTypes();
-      expect(types).toHaveLength(4);
+      // 4 base styles + 4 importance tiers = 8
+      expect(types).toHaveLength(8);
 
       const options = types.map((t) => t.options);
       // focus style
@@ -113,9 +114,10 @@ describe("HighlightManager", () => {
       }
 
       const apps = __getDecorationApplications();
-      // Each highlight_range call applies all 4 decoration types to the editor
-      // 4 calls * 4 types = 16 total applications
-      expect(apps.length).toBe(16);
+      // Each highlight_range call applies all 8 decoration types to the editor
+      // (4 base styles + 4 importance tiers)
+      // 4 calls * 8 types = 32 total applications
+      expect(apps.length).toBe(32);
       // Each of the 4 styles should have at least one non-empty range application
       const nonEmptyApps = apps.filter((a) => a.ranges.length > 0);
       expect(nonEmptyApps.length).toBeGreaterThanOrEqual(4);

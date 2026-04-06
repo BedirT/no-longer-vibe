@@ -105,6 +105,12 @@ function registerHighlightRange(
       style: z
         .enum(["focus", "context", "warning", "blast-radius"])
         .describe("Highlight style"),
+      importance: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Importance weight (0.0-1.0). When provided with 'focus' style, renders opacity-tiered highlighting."),
     },
     (args) => {
       toolEvents.fire({
@@ -114,6 +120,7 @@ function registerHighlightRange(
           startLine: args.startLine,
           endLine: args.endLine,
           style: args.style,
+          importance: args.importance,
         },
       });
 

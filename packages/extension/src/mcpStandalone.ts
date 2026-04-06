@@ -434,6 +434,12 @@ export function createStandaloneMcpServer(
       style: z
         .enum(["focus", "context", "warning", "blast-radius"])
         .describe("Highlight style"),
+      importance: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Importance weight (0.0-1.0). When provided with 'focus' style, renders opacity-tiered highlighting."),
     },
     async (args) => {
       if (ipcClient?.isConnected()) {
@@ -451,6 +457,7 @@ export function createStandaloneMcpServer(
               startLine: args.startLine,
               endLine: args.endLine,
               style: args.style,
+              importance: args.importance,
             }),
           },
         ],
