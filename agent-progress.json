@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-06",
   "current_milestone": "Phase 1: Core — COMPLETE",
-  "current_issue": "BED-102",
+  "current_issue": "BED-101",
   "features": [
     {
       "issue": "BED-60",
@@ -118,8 +118,14 @@
       "title": "/read-next command",
       "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/20"
+    },
+    {
+      "issue": "BED-101",
+      "title": "Extension progress.json filesystem watcher",
+      "status": "pr-created",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/48"
     }
   ],
   "blockers": [],
-  "next_action": "BED-102 PR created. Remaining backlog: BED-101 (extension progress watcher), BED-100 (importance highlighting), BED-97 (read-next optimization)."
+  "next_action": "BED-101 PR created (#48). Remaining backlog: BED-100 (importance highlighting), BED-97 (read-next optimization)."
 }

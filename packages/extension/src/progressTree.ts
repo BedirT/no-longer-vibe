@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { CodebaseMap, LayerName, ReadingOrderEntry } from "./types";
-import type { FileStatus } from "./fileDecorationProvider";
+import { isFileStatus, type FileStatus } from "./fileDecorationProvider";
 import type { McpToolEvent } from "./mcpServer";
 
 /** Canonical layer order as defined in the spec. */
@@ -112,6 +112,23 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   clearAll(): void {
     this.fileStatuses.clear();
     this.currentFile = undefined;
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Bulk-syncs file statuses from progress.json data.
+   * Replaces all existing statuses with the ones from progress data,
+   * preserving the currentFile. Fires a single tree refresh.
+   */
+  syncFromProgress(
+    files: Record<string, { status: string; read_at: string }>,
+  ): void {
+    this.fileStatuses.clear();
+    for (const [path, entry] of Object.entries(files)) {
+      if (isFileStatus(entry.status)) {
+        this.fileStatuses.set(path, entry.status);
+      }
+    }
     this._onDidChangeTreeData.fire();
   }
 
@@ -295,4 +312,5 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
       (entry) => entry.path === relativePath,
     );
   }
+
 }

@@ -319,6 +319,76 @@ describe("FileStatusDecorationProvider", () => {
     });
   });
 
+  describe("syncFromProgress", () => {
+    it("populates statuses from progress data", () => {
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+        "src/auth.ts": { status: "flagged", read_at: "2026-04-05T11:00:00Z" },
+      });
+
+      const configDeco = provider.provideFileDecoration(makeUri("src/config.ts"));
+      expect(configDeco!.badge).toBe("\u2713");
+
+      const authDeco = provider.provideFileDecoration(makeUri("src/auth.ts"));
+      expect(authDeco!.badge).toBe("!");
+    });
+
+    it("removes statuses for files no longer in progress data", () => {
+      provider.setFileStatus("src/old.ts", "confirmed");
+
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      expect(provider.provideFileDecoration(makeUri("src/old.ts"))).toBeUndefined();
+      expect(provider.getFileStatus("src/old.ts")).toBeUndefined();
+    });
+
+    it("preserves currentFile across sync", () => {
+      provider.setCurrentFile("src/config.ts");
+
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      // Current file decoration takes priority
+      const decoration = provider.provideFileDecoration(makeUri("src/config.ts"));
+      expect(decoration!.badge).toBe("\u25B8");
+    });
+
+    it("fires a global change event (undefined URI)", () => {
+      let firedWithUndefined = false;
+      provider.onDidChangeFileDecorations((uri) => {
+        if (uri === undefined) firedWithUndefined = true;
+      });
+
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      expect(firedWithUndefined).toBe(true);
+    });
+
+    it("handles skimmed status", () => {
+      provider.syncFromProgress({
+        "src/utils.ts": { status: "skimmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      const decoration = provider.provideFileDecoration(makeUri("src/utils.ts"));
+      expect(decoration!.badge).toBe("~");
+    });
+
+    it("ignores entries with unrecognized status", () => {
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+        "src/unknown.ts": { status: "unknown_status", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      expect(provider.getFileStatus("src/config.ts")).toBe("confirmed");
+      expect(provider.getFileStatus("src/unknown.ts")).toBeUndefined();
+    });
+  });
+
   describe("dispose", () => {
     it("can be called without error", () => {
       provider.setFileStatus("src/config.ts", "confirmed");

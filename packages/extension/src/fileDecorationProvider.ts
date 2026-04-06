@@ -10,6 +10,11 @@ import type { McpToolEvent } from "./mcpServer";
  */
 export type FileStatus = "confirmed" | "flagged" | "skimmed";
 
+/** Type guard: checks if a string is a valid FileStatus. */
+export function isFileStatus(value: string): value is FileStatus {
+  return value === "confirmed" || value === "flagged" || value === "skimmed";
+}
+
 /** Decoration config for each status. */
 interface DecorationConfig {
   badge: string;
@@ -136,6 +141,23 @@ export class FileStatusDecorationProvider
   clearAll(): void {
     this.statuses.clear();
     this.currentFile = undefined;
+    this._onDidChangeFileDecorations.fire(undefined);
+  }
+
+  /**
+   * Bulk-syncs file statuses from progress.json data.
+   * Replaces all existing statuses with the ones from progress data,
+   * preserving the currentFile. Fires a single global change event.
+   */
+  syncFromProgress(
+    files: Record<string, { status: string; read_at: string }>,
+  ): void {
+    this.statuses.clear();
+    for (const [path, entry] of Object.entries(files)) {
+      if (isFileStatus(entry.status)) {
+        this.statuses.set(path, entry.status);
+      }
+    }
     this._onDidChangeFileDecorations.fire(undefined);
   }
 
