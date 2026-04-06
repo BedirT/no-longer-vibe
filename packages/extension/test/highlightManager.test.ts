@@ -398,4 +398,191 @@ describe("HighlightManager", () => {
       expect(manager.getHighlightsForFile("src/unknown.ts")).toBeUndefined();
     });
   });
+
+  describe("importance-weighted highlighting (BED-100)", () => {
+    it("creates 8 decoration types: 4 base styles + 4 importance tiers", () => {
+      const types = __getDecorationTypes();
+      expect(types).toHaveLength(8);
+    });
+
+    it("tracks importance on highlight when provided", () => {
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+          importance: 0.8,
+        },
+      });
+
+      const tracked = manager.getHighlightsForFile("src/main.ts");
+      expect(tracked).toHaveLength(1);
+      expect(tracked![0].importance).toBe(0.8);
+    });
+
+    it("importance is undefined when not provided", () => {
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+        },
+      });
+
+      const tracked = manager.getHighlightsForFile("src/main.ts");
+      expect(tracked![0].importance).toBeUndefined();
+    });
+
+    it("uses critical tier for importance >= 0.75", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+          importance: 0.9,
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Critical tier: strong blue wash with thick border
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(59, 130, 246, 0.12)",
+      );
+      expect(appWithRanges!.decorationType.options.borderLeft).toBe(
+        "4px solid rgba(59, 130, 246, 0.6)",
+      );
+    });
+
+    it("uses important tier for importance >= 0.5", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+          importance: 0.6,
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Important tier: medium blue wash with thin border
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(59, 130, 246, 0.07)",
+      );
+      expect(appWithRanges!.decorationType.options.borderLeft).toBe(
+        "2px solid rgba(59, 130, 246, 0.4)",
+      );
+    });
+
+    it("uses standard tier for importance >= 0.25", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+          importance: 0.3,
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Standard tier: subtle wash, no border
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(59, 130, 246, 0.04)",
+      );
+      expect(appWithRanges!.decorationType.options.borderLeft).toBeUndefined();
+    });
+
+    it("uses low tier for importance < 0.25 (dead code)", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+          importance: 0.1,
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Low tier: red tint for dead code
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(239, 68, 68, 0.03)",
+      );
+      expect(appWithRanges!.decorationType.options.borderLeft).toBeUndefined();
+    });
+
+    it("falls back to base focus style when no importance provided", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "focus",
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Original focus style
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(59, 130, 246, 0.07)",
+      );
+      expect(appWithRanges!.decorationType.options.borderLeft).toBe(
+        "3px solid rgba(59, 130, 246, 0.5)",
+      );
+    });
+
+    it("ignores importance for non-focus styles", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: {
+          file: "src/main.ts",
+          startLine: 1,
+          endLine: 10,
+          style: "warning",
+          importance: 0.9,
+        },
+      });
+
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges).toBeDefined();
+      // Should still use the warning style, not importance tier
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
+        "rgba(245, 158, 11, 0.07)",
+      );
+    });
+  });
 });
