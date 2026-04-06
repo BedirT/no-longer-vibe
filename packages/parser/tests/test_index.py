@@ -14,6 +14,7 @@ import pytest
 
 from nlv.index import IndexResult, format_summary, run_index
 from nlv.layers import Layer
+from nlv.progress import FileStatus, ProgressManager
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -226,12 +227,70 @@ class TestProgressInit:
         map_data = _read_map(tmp_path)
         assert progress["stats"]["total"] == map_data["total_files"]
 
-    def test_re_index_overwrites_progress(self, tmp_path: Path) -> None:
-        """Re-running index overwrites progress.json (fresh start)."""
+    def test_re_index_preserves_confirmed_progress(
+        self, tmp_path: Path,
+    ) -> None:
+        """Re-running index preserves reading progress on unchanged files.
+
+        BED-102: Previously, re-indexing always overwrote progress.json
+        with a fresh state, losing all confirmed/flagged/skimmed status.
+        """
         _create_python_project(tmp_path)
         run_index(tmp_path)
-        assert (tmp_path / ".codebase-guide" / "progress.json").exists()
-        # Run again -- should not error
+
+        # Mark some files as confirmed
+        progress_data = _read_progress(tmp_path)
+        first_file = next(iter(progress_data["files"]))
+        mgr = ProgressManager(tmp_path / ".codebase-guide")
+        mgr.load()
+        mgr.update_file(
+            first_file, status=FileStatus.CONFIRMED, summary="Reviewed.",
+        )
+
+        # Re-index the same (unchanged) project
+        run_index(tmp_path)
+
+        new_progress = _read_progress(tmp_path)
+        assert new_progress["files"][first_file]["status"] == "confirmed"
+        assert new_progress["files"][first_file]["summary"] == "Reviewed."
+
+    def test_re_index_resets_modified_files(self, tmp_path: Path) -> None:
+        """Re-indexing resets progress for files whose content changed.
+
+        BED-102: After refresh, modified files should be unread while
+        unchanged files keep their status.
+        """
+        _create_python_project(tmp_path)
+        run_index(tmp_path)
+
+        # Mark all files as confirmed
+        mgr = ProgressManager(tmp_path / ".codebase-guide")
+        progress_data = mgr.load()
+        all_files = list(progress_data["files"])
+        for f in all_files:
+            mgr.update_file(
+                f, status=FileStatus.CONFIRMED, summary="Read.",
+            )
+
+        # Modify one file
+        src = tmp_path / "src"
+        (src / "config.py").write_text(
+            "DB_URL = 'postgres:///prod'\n"
+            "DEBUG = False\n"
+            "NEW_SETTING = True\n"
+        )
+
+        # Re-index
+        run_index(tmp_path)
+
+        new_progress = _read_progress(tmp_path)
+        # The modified file should be reset to unread
+        assert new_progress["files"]["src/config.py"]["status"] == "unread"
+
+    def test_re_index_does_not_error(self, tmp_path: Path) -> None:
+        """Re-running index on the same project does not raise."""
+        _create_python_project(tmp_path)
+        run_index(tmp_path)
         run_index(tmp_path)
         assert (tmp_path / ".codebase-guide" / "progress.json").exists()
 
