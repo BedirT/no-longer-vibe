@@ -40,7 +40,7 @@ from nlv.config import (
     is_excluded,
     match_custom_pass_override,
 )
-from nlv.graph import DependencyGraph
+from nlv.graph import DependencyGraph, FileNode
 from nlv.layers import Layer, LayerClassification
 from nlv.plugins import ExportKind, ParseResult
 
@@ -755,21 +755,23 @@ def _filter_graph(
     keep: set[str],
 ) -> DependencyGraph:
     """Return a DependencyGraph with only nodes in *keep*."""
-    from nlv.graph import FileNode
-
     filtered_nodes: dict[str, FileNode] = {}
     for path, node in graph.nodes.items():
         if path not in keep:
             continue
+        filtered_imports = tuple(i for i in node.imports if i in keep)
+        filtered_imported_by = tuple(
+            i for i in node.imported_by if i in keep
+        )
         filtered_nodes[path] = FileNode(
             path=node.path,
-            imports=tuple(i for i in node.imports if i in keep),
-            imported_by=tuple(i for i in node.imported_by if i in keep),
-            fan_in=sum(1 for i in node.imported_by if i in keep),
-            fan_out=sum(1 for i in node.imports if i in keep),
+            imports=filtered_imports,
+            imported_by=filtered_imported_by,
+            fan_in=len(filtered_imported_by),
+            fan_out=len(filtered_imports),
             depth=node.depth,
-            is_leaf=all(i not in keep for i in node.imported_by),
-            is_root=all(i not in keep for i in node.imports),
+            is_leaf=len(filtered_imported_by) == 0,
+            is_root=len(filtered_imports) == 0,
         )
 
     filtered_symbol_usage = {

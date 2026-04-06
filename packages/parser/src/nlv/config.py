@@ -341,7 +341,14 @@ def _parse_exclude_from_reading(value: object) -> tuple[str, ...]:
         msg = "exclude_from_reading must be a list of strings"
         raise ValueError(msg)
     typed = cast(list[object], value)
-    return tuple(str(item) for item in typed)
+    for item in typed:
+        if not isinstance(item, str):
+            msg = (
+                f"exclude_from_reading items must be strings, "
+                f"got {type(item).__name__}"
+            )
+            raise ValueError(msg)
+    return tuple(cast(list[str], typed))
 
 
 def is_excluded(path: str, config: ReadingConfig) -> bool:
