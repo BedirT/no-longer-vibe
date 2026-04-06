@@ -671,3 +671,37 @@ class TestRefreshEdgeCases:
         # b.py was already flagged, should still be flagged with stale note
         assert data["files"]["b.py"]["status"] == "flagged"
         assert "dependency changed" in data["files"]["b.py"]["note"].lower()
+
+
+class TestRefreshPreservesExistingProgress:
+    """Regression: refresh must not overwrite tracked files as 'new'."""
+
+    def test_empty_old_hashes_preserves_progress(
+        self, tmp_path: Path,
+    ) -> None:
+        """When old_content_hashes is empty, existing progress is kept."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py", "c.py"]
+        map_data = _make_map_data(files)
+
+        # Set up progress with some files read
+        _setup_progress(
+            guide_dir, map_data, confirmed=["a.py"], flagged=["b.py"],
+        )
+
+        # Re-run with empty old hashes (simulates missing old map.json)
+        new_map = _make_map_data(files)
+        new_hash = hashlib.sha256(
+            json.dumps(new_map).encode(),
+        ).hexdigest()
+
+        refresh_progress(
+            guide_dir, new_map, new_hash,
+            old_content_hashes={},
+        )
+
+        mgr = ProgressManager(guide_dir)
+        data = mgr.load()
+        assert data["files"]["a.py"]["status"] == "confirmed"
+        assert data["files"]["b.py"]["status"] == "flagged"
+        assert data["files"]["c.py"]["status"] == "unread"

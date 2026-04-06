@@ -277,8 +277,18 @@ class TestProgressInit:
                 f, status=FileStatus.CONFIRMED, summary="Read.",
             )
 
-        # Modify one file
+        # Add an independent file with no deps on config.py
         src = tmp_path / "src"
+        (src / "standalone.py").write_text("VERSION = '1.0'\n")
+        run_index(tmp_path)
+        mgr2 = ProgressManager(tmp_path / ".codebase-guide")
+        mgr2.update_file(
+            "src/standalone.py",
+            status=FileStatus.CONFIRMED,
+            summary="Read.",
+        )
+
+        # Modify one file
         (src / "config.py").write_text(
             "DB_URL = 'postgres:///prod'\n"
             "DEBUG = False\n"

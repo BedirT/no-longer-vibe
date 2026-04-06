@@ -196,7 +196,7 @@ class TestGenerateMapJson:
             reading_order=(),
             content_hashes={},
         )
-        assert result["total_files"] == 3
+        assert result["total_files"] == 0  # matches reading_order, not graph
 
     def test_content_hashes_passthrough(self) -> None:
         """content_hashes are passed through directly."""
@@ -523,7 +523,7 @@ class TestWriteMapJson:
 
         data = json.loads(map_file.read_text(encoding="utf-8"))
         assert data["version"] == "1.0.0"
-        assert data["total_files"] == 1
+        assert data["total_files"] == 0  # matches reading_order, not graph
 
     def test_overwrites_existing_file(self, tmp_path: Path) -> None:
         """Overwrites an existing map.json."""

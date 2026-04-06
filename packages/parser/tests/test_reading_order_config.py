@@ -589,10 +589,10 @@ class TestExcludeFromReadingOrder:
         assert "conftest.py" not in paths
         assert "src/app.py" in paths
 
-    def test_empty_exclude_keeps_all_files(self) -> None:
-        """Empty exclude_from_reading preserves all files."""
+    def test_empty_exclude_keeps_all_non_trivial_files(self) -> None:
+        """Empty exclude_from_reading preserves all non-trivial files."""
         results = {
-            "pkg/__init__.py": _empty_result(),
+            "pkg/utils.py": _empty_result(),
             "pkg/core.py": _empty_result(),
         }
         graph, classification = _build_graph_and_classification(
@@ -631,3 +631,80 @@ class TestExcludeFromReadingOrder:
 
         indices = [e.index for e in order]
         assert indices == list(range(len(order)))
+
+
+# ---------------------------------------------------------------------------
+# Trivial __init__.py auto-exclusion
+# ---------------------------------------------------------------------------
+
+
+class TestTrivialInitAutoExclusion:
+    """Trivial __init__.py files are auto-excluded from reading order."""
+
+    def test_empty_init_excluded(self) -> None:
+        """Empty __init__.py with no functions is auto-excluded."""
+        results = {
+            "pkg/__init__.py": _empty_result(),
+            "pkg/core.py": _function_heavy_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+        )
+
+        paths = [e.path for e in order]
+        assert "pkg/__init__.py" not in paths
+        assert "pkg/core.py" in paths
+
+    def test_init_with_functions_kept(self) -> None:
+        """__init__.py with real functions is kept in reading order."""
+        from nlv.plugins import FunctionRef
+
+        result_with_fn = ParseResult(
+            imports=(),
+            exports=(),
+            functions=(
+                FunctionRef(name="init_app", line=1, end_line=10, calls=()),
+            ),
+            entry_point=False,
+        )
+        results = {
+            "pkg/__init__.py": result_with_fn,
+            "pkg/core.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+        )
+
+        paths = [e.path for e in order]
+        assert "pkg/__init__.py" in paths
+
+    def test_non_init_files_unaffected(self) -> None:
+        """Regular .py files are never auto-excluded."""
+        results = {
+            "pkg/empty.py": _empty_result(),
+            "pkg/core.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+        )
+
+        paths = [e.path for e in order]
+        assert "pkg/empty.py" in paths

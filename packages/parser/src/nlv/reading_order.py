@@ -166,20 +166,31 @@ def compute_reading_order(
 
     all_files = set(graph.nodes)
 
-    # Remove files matching exclude_from_reading patterns
+    # Auto-exclude trivial __init__.py files (no functions and not re-exporting)
+    trivial_inits = {
+        f for f in all_files
+        if os.path.basename(f) == "__init__.py"
+        and _is_trivial_init(parse_results.get(f))
+    }
+
+    # Also exclude files matching exclude_from_reading patterns
+    config_excluded: set[str] = set()
     if config.exclude_from_reading:
-        excluded = {f for f in all_files if is_excluded(f, config)}
-        if excluded:
-            logger.debug("Excluding %d file(s) from reading order", len(excluded))
-            all_files -= excluded
-            # Build a filtered graph view with excluded nodes removed
-            graph = _filter_graph(graph, all_files)
-            parse_results = {
-                k: v for k, v in parse_results.items() if k in all_files
-            }
-            classification = _filter_classification(
-                classification, all_files,
-            )
+        config_excluded = {
+            f for f in all_files if is_excluded(f, config)
+        }
+
+    excluded = trivial_inits | config_excluded
+    if excluded:
+        logger.debug("Excluding %d file(s) from reading order", len(excluded))
+        all_files -= excluded
+        graph = _filter_graph(graph, all_files)
+        parse_results = {
+            k: v for k, v in parse_results.items() if k in all_files
+        }
+        classification = _filter_classification(
+            classification, all_files,
+        )
 
     test_pairs = find_paired_test_files(all_files)
 
@@ -748,6 +759,22 @@ def _build_reason(
 # ---------------------------------------------------------------------------
 # Exclusion filtering helpers
 # ---------------------------------------------------------------------------
+
+
+def _is_trivial_init(result: ParseResult | None) -> bool:
+    """Check if an __init__.py has no meaningful code worth reading.
+
+    Trivial if it has no functions AND is not a re-export hub
+    (i.e., does not both import and export symbols).
+    """
+    if result is None:
+        return True
+    if result.functions:
+        return False
+    # Re-export hubs (import from submodules + export) are meaningful
+    if result.imports and result.exports:
+        return False
+    return True
 
 
 def _filter_graph(
