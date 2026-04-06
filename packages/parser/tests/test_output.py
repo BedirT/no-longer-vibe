@@ -1,11 +1,11 @@
-"""Tests for map.json output generation (BED-70)."""
+"""Tests for map.json output generation (BED-70, BED-100)."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from nlv.graph import DependencyGraph, FileNode
+from nlv.graph import DependencyGraph, FileNode, SymbolUsageEntry
 from nlv.layers import Layer, LayerClassification
 from nlv.output import generate_map_json, write_map_json
 from nlv.reading_order import ReadingOrderEntry, ReadingPass
@@ -695,3 +695,103 @@ class TestWriteMapJson:
 
         raw = (output_dir / "map.json").read_text(encoding="utf-8")
         assert raw.endswith("\n")
+
+
+# ---------------------------------------------------------------------------
+# Tests: symbol_usage in reading_order (BED-100)
+# ---------------------------------------------------------------------------
+
+
+class TestSymbolUsageInOutput:
+    """Tests for symbol_usage emission in map.json reading_order entries."""
+
+    def test_reading_order_includes_symbol_usage(self) -> None:
+        """Reading order entries include symbol_usage from the graph."""
+        node = _make_file_node(
+            "b.py", imported_by=("a.py",),
+        )
+        graph = DependencyGraph(
+            nodes={"b.py": node, "a.py": _make_file_node("a.py", imports=("b.py",))},
+            external_deps=(),
+            cycles=(),
+            symbol_usage={
+                "b.py": {
+                    "foo": SymbolUsageEntry(callers=1, used_by=("a.py",)),
+                    "bar": SymbolUsageEntry(callers=0, used_by=()),
+                },
+                "a.py": {},
+            },
+        )
+        classification = _make_classification({
+            "b.py": Layer.FOUNDATION,
+            "a.py": Layer.CORE,
+        })
+        entry = _make_reading_order_entry(
+            index=0, path="b.py", exports=("foo", "bar"),
+        )
+        result = generate_map_json(
+            repo_root="/repo",
+            graph=graph,
+            classification=classification,
+            reading_order=(entry,),
+            content_hashes={},
+        )
+
+        ro_item = result["reading_order"][0]
+        assert "symbol_usage" in ro_item
+        assert "foo" in ro_item["symbol_usage"]
+        assert ro_item["symbol_usage"]["foo"]["callers"] == 1
+        assert ro_item["symbol_usage"]["foo"]["used_by"] == ["a.py"]
+        assert ro_item["symbol_usage"]["bar"]["callers"] == 0
+        assert ro_item["symbol_usage"]["bar"]["used_by"] == []
+
+    def test_reading_order_empty_symbol_usage(self) -> None:
+        """Files with no exports get an empty symbol_usage dict."""
+        node = _make_file_node("a.py")
+        graph = DependencyGraph(
+            nodes={"a.py": node},
+            external_deps=(),
+            cycles=(),
+            symbol_usage={"a.py": {}},
+        )
+        classification = _make_classification({"a.py": Layer.FOUNDATION})
+        entry = _make_reading_order_entry(index=0, path="a.py")
+        result = generate_map_json(
+            repo_root="/repo",
+            graph=graph,
+            classification=classification,
+            reading_order=(entry,),
+            content_hashes={},
+        )
+
+        assert result["reading_order"][0]["symbol_usage"] == {}
+
+    def test_symbol_usage_json_serializable(self) -> None:
+        """symbol_usage data is fully JSON-serializable."""
+        node = _make_file_node("x.py")
+        graph = DependencyGraph(
+            nodes={"x.py": node},
+            external_deps=(),
+            cycles=(),
+            symbol_usage={
+                "x.py": {
+                    "func": SymbolUsageEntry(callers=3, used_by=("a.py", "b.py", "c.py")),
+                },
+            },
+        )
+        classification = _make_classification({"x.py": Layer.FOUNDATION})
+        entry = _make_reading_order_entry(
+            index=0, path="x.py", exports=("func",),
+        )
+        result = generate_map_json(
+            repo_root="/repo",
+            graph=graph,
+            classification=classification,
+            reading_order=(entry,),
+            content_hashes={},
+        )
+
+        # Must not raise
+        serialized = json.dumps(result, sort_keys=True)
+        deserialized = json.loads(serialized)
+        assert deserialized["reading_order"][0]["symbol_usage"]["func"]["callers"] == 3
