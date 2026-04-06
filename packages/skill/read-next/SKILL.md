@@ -76,11 +76,20 @@ When MCP tools **are** available, augment the reading flow:
    - Call `open_file` with the file path and the first significant
      line number (e.g., first export or function definition).
 
-2. **Highlight the current section** as the user reads:
-   - Call `highlight_range` with style `"focus"` on the primary
-     function or export body.
+2. **Highlight the current section** with importance-weighted visuals:
+   - Call `highlight_range` with style `"focus"` on each function or
+     export body. Include the `importance` parameter (0.0-1.0) to
+     apply opacity-tiered visual weight.
+   - Compute default importance from `symbol_usage` in the reading
+     order entry: normalize caller counts to 0.0-1.0 (e.g.,
+     `min(callers / 8, 1.0)`). Dead code (callers=0) gets
+     `importance: 0.0`.
+   - Override structural importance with semantic judgment: elevate
+     security-critical code even if callers are few, lower
+     boilerplate even if callers are many.
    - Call `highlight_range` with style `"context"` on import blocks
-     or setup code the user has already read.
+     or setup code the user has already read (no importance needed
+     for context highlights).
 
 3. **Update decorations** when the user marks a file:
    - On `confirmed` / `done` / `next`: call `mark_read` with the
