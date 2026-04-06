@@ -7,6 +7,7 @@ import {
   dispose as disposeProgress,
   loadProgressData,
   onProgressDataChanged,
+  updateFileStatus,
   watchProgressJson,
 } from "./progressData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
@@ -190,6 +191,24 @@ export async function activate(
     );
     for (const d of progressTreeMcpDisposables) {
       context.subscriptions.push(d);
+    }
+
+    // Register manual marking commands (right-click context menu)
+    for (const [cmd, status] of [
+      ["nlv.markConfirmed", "confirmed"],
+      ["nlv.markFlagged", "flagged"],
+      ["nlv.markSkimmed", "skimmed"],
+    ] as const) {
+      const disposable = vscode.commands.registerCommand(
+        cmd,
+        async (item?: vscode.TreeItem) => {
+          const ctx = item?.contextValue ?? "";
+          if (!ctx.startsWith("file:")) return;
+          const filePath = ctx.slice("file:".length);
+          await updateFileStatus(filePath, status);
+        },
+      );
+      context.subscriptions.push(disposable);
     }
 
     // Populate initial progress state from progress.json

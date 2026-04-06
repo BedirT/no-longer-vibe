@@ -73,7 +73,7 @@ def generate_map_json(
         "layers": _build_layers(classification),
         "reading_order": _build_reading_order(reading_order, graph.symbol_usage),
         "repo_root": repo_root,
-        "total_files": len(graph.nodes),
+        "total_files": len(reading_order),
         "version": _MAP_VERSION,
     }
 

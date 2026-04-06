@@ -8,6 +8,7 @@ import {
   getProgressJsonUri,
   loadProgressData,
   getProgressData,
+  updateFileStatus,
   watchProgressJson,
   onProgressDataChanged,
   dispose as disposeProgressData,
@@ -235,6 +236,47 @@ describe("progressData", () => {
       expect(received[0]).toBeUndefined();
       sub.dispose();
       disposable.dispose();
+    });
+  });
+
+  describe("updateFileStatus", () => {
+    it("returns false when no progress is loaded", async () => {
+      const result = await updateFileStatus("src/config.ts", "confirmed");
+      expect(result).toBe(false);
+    });
+
+    it("updates file status in progress.json", async () => {
+      const progressUri = getProgressJsonUri()!;
+      __setFileContent(progressUri.path, VALID_PROGRESS);
+      await loadProgressData();
+
+      const result = await updateFileStatus("src/config.ts", "confirmed");
+      expect(result).toBe(true);
+
+      const data = getProgressData();
+      expect(data?.files["src/config.ts"].status).toBe("confirmed");
+    });
+
+    it("recomputes stats after status change", async () => {
+      const progressUri = getProgressJsonUri()!;
+      __setFileContent(progressUri.path, VALID_PROGRESS);
+      await loadProgressData();
+
+      await updateFileStatus("src/config.ts", "flagged");
+
+      const data = getProgressData();
+      expect(data?.stats.flagged).toBeGreaterThan(0);
+    });
+
+    it("marks a file as skimmed", async () => {
+      const progressUri = getProgressJsonUri()!;
+      __setFileContent(progressUri.path, VALID_PROGRESS);
+      await loadProgressData();
+
+      await updateFileStatus("src/config.ts", "skimmed");
+
+      const data = getProgressData();
+      expect(data?.files["src/config.ts"].status).toBe("skimmed");
     });
   });
 });

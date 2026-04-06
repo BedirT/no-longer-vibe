@@ -38,6 +38,57 @@
         }
       ]
     },
+    "commands": [
+      {
+        "command": "nlv.markConfirmed",
+        "title": "Mark as Confirmed",
+        "icon": "$(check)"
+      },
+      {
+        "command": "nlv.markFlagged",
+        "title": "Mark as Flagged",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "nlv.markSkimmed",
+        "title": "Mark as Skimmed",
+        "icon": "$(eye-closed)"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "nlv.markConfirmed",
+          "when": "viewItem =~ /^file:/",
+          "group": "nlv@1"
+        },
+        {
+          "command": "nlv.markFlagged",
+          "when": "viewItem =~ /^file:/",
+          "group": "nlv@2"
+        },
+        {
+          "command": "nlv.markSkimmed",
+          "when": "viewItem =~ /^file:/",
+          "group": "nlv@3"
+        }
+      ],
+      "view/title": [],
+      "commandPalette": [
+        {
+          "command": "nlv.markConfirmed",
+          "when": "false"
+        },
+        {
+          "command": "nlv.markFlagged",
+          "when": "false"
+        },
+        {
+          "command": "nlv.markSkimmed",
+          "when": "false"
+        }
+      ]
+    },
     "colors": [
       {
         "id": "noLongerVibe.confirmed",

@@ -165,6 +165,58 @@ export function watchProgressJson(): vscode.Disposable {
 }
 
 /**
+ * Updates a single file's status in progress.json on disk.
+ * The FileSystemWatcher will detect the change and reload automatically.
+ */
+export async function updateFileStatus(
+  relativePath: string,
+  status: "confirmed" | "flagged" | "skimmed",
+): Promise<boolean> {
+  const uri = getProgressJsonUri();
+  if (!uri || !currentProgress) {
+    log("Cannot update file status: no progress.json loaded");
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  currentProgress.files[relativePath] = {
+    status,
+    read_at: now,
+    note: currentProgress.files[relativePath]?.note ?? null,
+    summary: currentProgress.files[relativePath]?.summary ?? null,
+  };
+
+  // Recompute stats
+  const files = currentProgress.files;
+  let confirmed = 0;
+  let flagged = 0;
+  let skimmed = 0;
+  for (const entry of Object.values(files)) {
+    if (entry.status === "confirmed") confirmed++;
+    else if (entry.status === "flagged") flagged++;
+    else if (entry.status === "skimmed") skimmed++;
+  }
+  currentProgress.stats = {
+    total: currentProgress.stats.total,
+    confirmed,
+    flagged,
+    skimmed,
+    unread: currentProgress.stats.total - confirmed - flagged - skimmed,
+  };
+
+  try {
+    const content = JSON.stringify(currentProgress, null, 2) + "\n";
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+    log(`Updated ${relativePath} to ${status}`);
+    return true;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Failed to write progress.json: ${message}`);
+    return false;
+  }
+}
+
+/**
  * Disposes all resources (watcher, output channel, event emitter).
  */
 export function dispose(): void {

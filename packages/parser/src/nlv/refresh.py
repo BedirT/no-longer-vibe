@@ -226,14 +226,15 @@ def refresh_progress(
             "summary": None,
         }
 
-    # 3. Add new files as unread
+    # 3. Add new files as unread (preserve existing progress if already tracked)
     for path in diff.new_files:
-        files[path] = {
-            "status": FileStatus.UNREAD.value,
-            "read_at": None,
-            "note": None,
-            "summary": None,
-        }
+        if path not in files:
+            files[path] = {
+                "status": FileStatus.UNREAD.value,
+                "read_at": None,
+                "note": None,
+                "summary": None,
+            }
 
     # 4. Transitive invalidation — exclude files that are already
     #    unread or were just modified/newly added

@@ -410,6 +410,9 @@ export const workspace = {
       }
       return content;
     }),
+    writeFile: vi.fn(async (uri: Uri, content: Uint8Array): Promise<void> => {
+      mockFileContents.set(uri.path, content);
+    }),
   },
   createFileSystemWatcher: vi.fn((): MockFileSystemWatcher => {
     lastCreatedWatcher = new MockFileSystemWatcher();
