@@ -70,6 +70,13 @@ class SymbolUsageEntry:
     callers: int
     used_by: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        if self.callers != len(self.used_by):
+            msg = (
+                f"callers={self.callers} != len(used_by)={len(self.used_by)}"
+            )
+            raise ValueError(msg)
+
 
 @dataclass(frozen=True)
 class DependencyGraph:
@@ -352,7 +359,7 @@ def _compute_symbol_usage(
     """
     # Build export index: file_path -> set of export names
     export_names: dict[str, set[str]] = {}
-    for path, result in parse_results.items():
+    for path, result in sorted(parse_results.items()):
         export_names[path] = {e.name for e in result.exports}
 
     # Accumulate: target_file -> export_name -> set of importing files

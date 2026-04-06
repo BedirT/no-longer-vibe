@@ -30,7 +30,12 @@ const STYLE_CONFIGS: Record<HighlightStyle, DecorationStyleConfig> = {
 /** Importance tier names for focus-style highlights (BED-100). */
 type ImportanceTier = "critical" | "important" | "standard" | "low";
 
-/** Opacity-tiered configs for importance-weighted focus highlights. */
+/**
+ * Opacity-tiered configs for importance-weighted focus highlights.
+ * 8 decoration types total (4 base + 4 tiers), but a single file view
+ * shows at most 3-4 simultaneous channels (context + 1-2 tiers),
+ * staying within the SPEC's research-based limit.
+ */
 const IMPORTANCE_TIER_CONFIGS: Record<ImportanceTier, DecorationStyleConfig> = {
   critical: {
     backgroundColor: "rgba(59, 130, 246, 0.12)",

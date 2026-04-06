@@ -564,6 +564,61 @@ describe("HighlightManager", () => {
       );
     });
 
+    it("uses critical tier at exact boundary 0.75", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 0.75 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.12)");
+    });
+
+    it("uses important tier just below 0.75", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 0.74 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.07)");
+    });
+
+    it("uses standard tier at exact boundary 0.25", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 0.25 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.04)");
+    });
+
+    it("handles importance 0.0 as low tier", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 0.0 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(239, 68, 68, 0.03)");
+    });
+
+    it("handles importance 1.0 as critical tier", () => {
+      __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
+      toolEvents.fire({
+        tool: "highlight_range",
+        params: { file: "src/main.ts", startLine: 1, endLine: 5, style: "focus", importance: 1.0 },
+      });
+      const apps = __getDecorationApplications();
+      const appWithRanges = apps.find((a) => a.ranges.length > 0);
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.12)");
+    });
+
     it("ignores importance for non-focus styles", () => {
       __setVisibleTextEditors([__createMockEditor("src/main.ts")]);
 

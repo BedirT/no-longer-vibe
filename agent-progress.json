@@ -122,7 +122,7 @@
     {
       "issue": "BED-101",
       "title": "Extension progress.json filesystem watcher",
-      "status": "pr-created",
+      "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/48"
     }
   ],

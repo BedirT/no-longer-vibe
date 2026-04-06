@@ -174,7 +174,12 @@ Within each pass, files are topologically sorted so you never read a file before
       "line_count": 45,
       "imports": [],
       "imported_by": ["src/models/user.ts", "src/services/db.ts", "..."],
-      "exports": ["AppConfig", "getConfig", "DEFAULT_CONFIG"]
+      "exports": ["AppConfig", "getConfig", "DEFAULT_CONFIG"],
+      "symbol_usage": {
+        "AppConfig": { "callers": 12, "used_by": ["src/models/user.ts", "src/services/db.ts", "..."] },
+        "getConfig": { "callers": 8, "used_by": ["src/app.ts", "src/services/db.ts", "..."] },
+        "DEFAULT_CONFIG": { "callers": 0, "used_by": [] }
+      }
     }
   ],
   "dependency_graph": {

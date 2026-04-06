@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 
 from nlv.graph import (
-    DependencyGraph,
     SymbolUsageEntry,
     build_graph,
 )
@@ -54,6 +53,10 @@ class TestSymbolUsageEntry:
         entry = SymbolUsageEntry(callers=0, used_by=())
         assert entry.callers == 0
         assert entry.used_by == ()
+
+    def test_callers_must_match_used_by_length(self) -> None:
+        with pytest.raises(ValueError, match="callers=2 != len"):
+            SymbolUsageEntry(callers=2, used_by=("a.py",))
 
 
 # ---------------------------------------------------------------------------

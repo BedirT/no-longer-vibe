@@ -82,8 +82,9 @@ When MCP tools **are** available, augment the reading flow:
      apply opacity-tiered visual weight.
    - Compute default importance from `symbol_usage` in the reading
      order entry: normalize caller counts to 0.0-1.0 (e.g.,
-     `min(callers / 8, 1.0)`). Dead code (callers=0) gets
-     `importance: 0.0`.
+     `min(callers / 8, 1.0)` — 8 callers saturates to full importance
+     since 8+ callers indicates a widely-used symbol in most codebases).
+     Dead code (callers=0) gets `importance: 0.0`.
    - Override structural importance with semantic judgment: elevate
      security-critical code even if callers are few, lower
      boilerplate even if callers are many.
