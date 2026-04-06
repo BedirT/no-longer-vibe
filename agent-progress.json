@@ -3,7 +3,7 @@
   "linear_project": "No Longer Vibe",
   "last_session": "2026-04-06",
   "current_milestone": "Phase 1: Core — COMPLETE",
-  "current_issue": "BED-101",
+  "current_issue": "BED-100",
   "features": [
     {
       "issue": "BED-60",
@@ -127,5 +127,5 @@
     }
   ],
   "blockers": [],
-  "next_action": "BED-101 PR created (#48). Remaining backlog: BED-100 (importance highlighting), BED-97 (read-next optimization)."
+  "next_action": "BED-100 PR pending. Remaining backlog: BED-97 (read-next optimization)."
 }
