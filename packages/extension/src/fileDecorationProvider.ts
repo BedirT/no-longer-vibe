@@ -10,6 +10,11 @@ import type { McpToolEvent } from "./mcpServer";
  */
 export type FileStatus = "confirmed" | "flagged" | "skimmed";
 
+/** Type guard: checks if a string is a valid FileStatus. */
+export function isFileStatus(value: string): value is FileStatus {
+  return value === "confirmed" || value === "flagged" || value === "skimmed";
+}
+
 /** Decoration config for each status. */
 interface DecorationConfig {
   badge: string;
@@ -149,8 +154,8 @@ export class FileStatusDecorationProvider
   ): void {
     this.statuses.clear();
     for (const [path, entry] of Object.entries(files)) {
-      if (this.isValidStatus(entry.status)) {
-        this.statuses.set(path, entry.status as FileStatus);
+      if (isFileStatus(entry.status)) {
+        this.statuses.set(path, entry.status);
       }
     }
     this._onDidChangeFileDecorations.fire(undefined);
@@ -234,9 +239,5 @@ export class FileStatusDecorationProvider
   private toUri(relativePath: string): vscode.Uri {
     const fullPath = `${this.workspaceRoot}/${relativePath}`;
     return vscode.Uri.file(fullPath);
-  }
-
-  private isValidStatus(status: string): boolean {
-    return status === "confirmed" || status === "flagged" || status === "skimmed";
   }
 }

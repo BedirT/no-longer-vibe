@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 /** Reading status for a single file in progress.json. */
 export interface ProgressFileEntry {
+  /** Expected values: "confirmed" | "flagged" | "skimmed". Validated at sync boundary via isFileStatus(). */
   status: string;
   read_at: string;
   note?: string | null;
@@ -128,8 +129,14 @@ export function watchProgressJson(): vscode.Disposable {
     watcher.dispose();
   }
 
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders || folders.length === 0) {
+    log("No workspace folder found; cannot watch progress.json");
+    return new vscode.Disposable(() => {});
+  }
+
   const pattern = new vscode.RelativePattern(
-    vscode.workspace.workspaceFolders![0],
+    folders[0],
     ".codebase-guide/progress.json",
   );
 

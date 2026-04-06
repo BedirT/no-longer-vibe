@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import type { CodebaseMap, LayerName, ReadingOrderEntry } from "./types";
-import type { FileStatus } from "./fileDecorationProvider";
+import { isFileStatus, type FileStatus } from "./fileDecorationProvider";
 import type { McpToolEvent } from "./mcpServer";
 
 /** Canonical layer order as defined in the spec. */
@@ -125,8 +125,8 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   ): void {
     this.fileStatuses.clear();
     for (const [path, entry] of Object.entries(files)) {
-      if (this.isValidStatus(entry.status)) {
-        this.fileStatuses.set(path, entry.status as FileStatus);
+      if (isFileStatus(entry.status)) {
+        this.fileStatuses.set(path, entry.status);
       }
     }
     this._onDidChangeTreeData.fire();
@@ -313,7 +313,4 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     );
   }
 
-  private isValidStatus(status: string): boolean {
-    return status === "confirmed" || status === "flagged" || status === "skimmed";
-  }
 }
