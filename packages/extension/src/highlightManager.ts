@@ -27,11 +27,46 @@ const STYLE_CONFIGS: Record<HighlightStyle, DecorationStyleConfig> = {
   },
 };
 
+/** Importance tier names for focus-style highlights (BED-100). */
+type ImportanceTier = "critical" | "important" | "standard" | "low";
+
+/**
+ * Opacity-tiered configs for importance-weighted focus highlights.
+ * 8 decoration types total (4 base + 4 tiers), but a single file view
+ * shows at most 3-4 simultaneous channels (context + 1-2 tiers),
+ * staying within the SPEC's research-based limit.
+ */
+const IMPORTANCE_TIER_CONFIGS: Record<ImportanceTier, DecorationStyleConfig> = {
+  critical: {
+    backgroundColor: "rgba(59, 130, 246, 0.12)",
+    borderLeft: "4px solid rgba(59, 130, 246, 0.6)",
+  },
+  important: {
+    backgroundColor: "rgba(59, 130, 246, 0.07)",
+    borderLeft: "2px solid rgba(59, 130, 246, 0.4)",
+  },
+  standard: {
+    backgroundColor: "rgba(59, 130, 246, 0.04)",
+  },
+  low: {
+    backgroundColor: "rgba(239, 68, 68, 0.03)",
+  },
+};
+
+/** Maps a 0.0-1.0 importance value to a tier name. */
+function importanceToTier(importance: number): ImportanceTier {
+  if (importance >= 0.75) return "critical";
+  if (importance >= 0.5) return "important";
+  if (importance >= 0.25) return "standard";
+  return "low";
+}
+
 /** A tracked highlight applied to a file. */
 export interface TrackedHighlight {
   style: HighlightStyle;
   startLine: number;
   endLine: number;
+  importance?: number;
 }
 
 /**
@@ -48,6 +83,12 @@ export class HighlightManager {
     vscode.TextEditorDecorationType
   > = new Map();
 
+  /** Importance-tiered decoration types for focus highlights (BED-100). */
+  private readonly importanceTierTypes: Map<
+    ImportanceTier,
+    vscode.TextEditorDecorationType
+  > = new Map();
+
   /** Active highlights per file path. */
   private readonly activeHighlights: Map<string, TrackedHighlight[]> =
     new Map();
@@ -59,7 +100,7 @@ export class HighlightManager {
   private disposed = false;
 
   constructor(onToolEvent: vscode.Event<McpToolEvent>) {
-    // Create decoration types for all four styles
+    // Create decoration types for all four base styles
     for (const [style, config] of Object.entries(STYLE_CONFIGS)) {
       const options: vscode.DecorationRenderOptions = {
         backgroundColor: config.backgroundColor,
@@ -73,6 +114,22 @@ export class HighlightManager {
       const decorationType =
         vscode.window.createTextEditorDecorationType(options);
       this.decorationTypes.set(style as HighlightStyle, decorationType);
+    }
+
+    // Create decoration types for importance tiers (BED-100)
+    for (const [tier, config] of Object.entries(IMPORTANCE_TIER_CONFIGS)) {
+      const options: vscode.DecorationRenderOptions = {
+        backgroundColor: config.backgroundColor,
+        isWholeLine: true,
+      };
+
+      if (config.borderLeft) {
+        options.borderLeft = config.borderLeft;
+      }
+
+      const decorationType =
+        vscode.window.createTextEditorDecorationType(options);
+      this.importanceTierTypes.set(tier as ImportanceTier, decorationType);
     }
 
     // Subscribe to MCP tool events
@@ -105,7 +162,11 @@ export class HighlightManager {
     for (const decorationType of this.decorationTypes.values()) {
       decorationType.dispose();
     }
+    for (const decorationType of this.importanceTierTypes.values()) {
+      decorationType.dispose();
+    }
     this.decorationTypes.clear();
+    this.importanceTierTypes.clear();
     this.activeHighlights.clear();
   }
 
@@ -130,8 +191,9 @@ export class HighlightManager {
     const startLine = params.startLine as number;
     const endLine = params.endLine as number;
     const style = params.style as HighlightStyle;
+    const importance = params.importance as number | undefined;
 
-    const highlight: TrackedHighlight = { style, startLine, endLine };
+    const highlight: TrackedHighlight = { style, startLine, endLine, importance };
 
     // Add to tracking
     const existing = this.activeHighlights.get(file) ?? [];
@@ -171,18 +233,41 @@ export class HighlightManager {
     // Find visible editors for this file
     const editors = this.findEditorsForFile(filePath);
 
-    // Group highlights by style
+    // Group highlights by style (base styles)
     const rangesByStyle = new Map<HighlightStyle, vscode.Range[]>();
+    // Group importance-tiered highlights by tier
+    const rangesByTier = new Map<ImportanceTier, vscode.Range[]>();
+
     for (const highlight of highlights) {
-      const ranges = rangesByStyle.get(highlight.style) ?? [];
-      ranges.push(this.toRange(highlight.startLine, highlight.endLine));
-      rangesByStyle.set(highlight.style, ranges);
+      const range = this.toRange(highlight.startLine, highlight.endLine);
+
+      if (
+        highlight.style === "focus" &&
+        highlight.importance !== undefined
+      ) {
+        // Use importance-tiered decoration instead of base focus
+        const tier = importanceToTier(highlight.importance);
+        const ranges = rangesByTier.get(tier) ?? [];
+        ranges.push(range);
+        rangesByTier.set(tier, ranges);
+      } else {
+        // Use base style decoration
+        const ranges = rangesByStyle.get(highlight.style) ?? [];
+        ranges.push(range);
+        rangesByStyle.set(highlight.style, ranges);
+      }
     }
 
-    // Apply each style's ranges to each editor
+    // Apply decorations to each editor
     for (const editor of editors) {
+      // Apply base style decorations
       for (const [style, decorationType] of this.decorationTypes) {
         const ranges = rangesByStyle.get(style) ?? [];
+        editor.setDecorations(decorationType, ranges);
+      }
+      // Apply importance tier decorations
+      for (const [tier, decorationType] of this.importanceTierTypes) {
+        const ranges = rangesByTier.get(tier) ?? [];
         editor.setDecorations(decorationType, ranges);
       }
     }
@@ -196,6 +281,9 @@ export class HighlightManager {
 
     for (const editor of editors) {
       for (const decorationType of this.decorationTypes.values()) {
+        editor.setDecorations(decorationType, []);
+      }
+      for (const decorationType of this.importanceTierTypes.values()) {
         editor.setDecorations(decorationType, []);
       }
     }

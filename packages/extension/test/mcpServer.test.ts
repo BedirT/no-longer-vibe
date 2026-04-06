@@ -266,6 +266,41 @@ describe("mcpServer", () => {
     }
   });
 
+  describe("highlight_range importance parameter (BED-100)", () => {
+    it("accepts optional importance parameter", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: McpToolEvent[] = [];
+      toolEvents.event((e) => events.push(e));
+
+      const result = await callTool(server, "highlight_range", {
+        file: "src/main.ts",
+        startLine: 1,
+        endLine: 10,
+        style: "focus",
+        importance: 0.8,
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(events[0].params.importance).toBe(0.8);
+    });
+
+    it("works without importance parameter", async () => {
+      const { server, toolEvents } = createMcpServer();
+      const events: McpToolEvent[] = [];
+      toolEvents.event((e) => events.push(e));
+
+      const result = await callTool(server, "highlight_range", {
+        file: "src/main.ts",
+        startLine: 1,
+        endLine: 10,
+        style: "focus",
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(events[0].params.importance).toBeUndefined();
+    });
+  });
+
   describe("tool result content format", () => {
     it("returns text content for highlight_range", async () => {
       const { server } = createMcpServer();

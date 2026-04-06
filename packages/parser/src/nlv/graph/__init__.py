@@ -8,7 +8,7 @@ dependency depth computation, reverse dependencies, and derived metrics.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from nlv.plugins import ParseResult
 
@@ -59,6 +59,26 @@ class ExternalDep:
 
 
 @dataclass(frozen=True)
+class SymbolUsageEntry:
+    """Per-symbol usage data: how many files import this specific export.
+
+    Attributes:
+        callers: Number of files that import this symbol.
+        used_by: Sorted tuple of file paths that import this symbol.
+    """
+
+    callers: int
+    used_by: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if self.callers != len(self.used_by):
+            msg = (
+                f"callers={self.callers} != len(used_by)={len(self.used_by)}"
+            )
+            raise ValueError(msg)
+
+
+@dataclass(frozen=True)
 class DependencyGraph:
     """The complete dependency graph for a codebase.
 
@@ -66,11 +86,16 @@ class DependencyGraph:
         nodes: Mapping of file path to FileNode.
         external_deps: Tuple of external dependencies.
         cycles: Tuple of detected cycles, each a tuple of file paths.
+        symbol_usage: Per-file, per-export usage data. Maps file path to
+            a dict of export name to SymbolUsageEntry.
     """
 
     nodes: dict[str, FileNode]
     external_deps: tuple[ExternalDep, ...]
     cycles: tuple[tuple[str, ...], ...]
+    symbol_usage: dict[str, dict[str, SymbolUsageEntry]] = field(
+        default_factory=lambda: {},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -107,11 +132,15 @@ def build_graph(
 
     nodes = _assemble_nodes(adjacency, depths)
     external_deps = _assemble_external_deps(external_map)
+    symbol_usage = _compute_symbol_usage(
+        parse_results, resolved_imports, known_files,
+    )
 
     return DependencyGraph(
         nodes=nodes,
         external_deps=external_deps,
         cycles=cycles,
+        symbol_usage=symbol_usage,
     )
 
 
@@ -311,6 +340,59 @@ def _compute_depths(
             dfs(node, set())
 
     return depths
+
+
+# ---------------------------------------------------------------------------
+# Symbol-level usage tracking (BED-100)
+# ---------------------------------------------------------------------------
+
+
+def _compute_symbol_usage(
+    parse_results: dict[str, ParseResult],
+    resolved_imports: dict[tuple[str, str], str],
+    known_files: set[str],
+) -> dict[str, dict[str, SymbolUsageEntry]]:
+    """Compute per-symbol caller counts by joining import specifiers to exports.
+
+    For each file, every export gets a SymbolUsageEntry tracking how many
+    other files import that specific symbol and which files those are.
+    """
+    # Build export index: file_path -> set of export names
+    export_names: dict[str, set[str]] = {}
+    for path, result in sorted(parse_results.items()):
+        export_names[path] = {e.name for e in result.exports}
+
+    # Accumulate: target_file -> export_name -> set of importing files
+    usage_map: dict[str, dict[str, set[str]]] = {
+        path: {name: set() for name in names}
+        for path, names in export_names.items()
+    }
+
+    for from_file, result in sorted(parse_results.items()):
+        for imp in result.imports:
+            if not imp.specifiers:
+                continue
+            resolved = resolved_imports.get((from_file, imp.source))
+            if resolved is None or resolved not in known_files:
+                continue
+            target_exports = export_names.get(resolved, set())
+            for spec in imp.specifiers:
+                if spec in target_exports:
+                    usage_map[resolved][spec].add(from_file)
+
+    # Convert to frozen SymbolUsageEntry
+    output: dict[str, dict[str, SymbolUsageEntry]] = {}
+    for path in sorted(parse_results):
+        entries: dict[str, SymbolUsageEntry] = {}
+        for name in sorted(usage_map.get(path, {})):
+            users = usage_map[path][name]
+            entries[name] = SymbolUsageEntry(
+                callers=len(users),
+                used_by=tuple(sorted(users)),
+            )
+        output[path] = entries
+
+    return output
 
 
 # ---------------------------------------------------------------------------
