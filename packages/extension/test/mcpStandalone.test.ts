@@ -1,0 +1,412 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+
+// Do NOT mock vscode — the standalone server must not import it at all.
+// We verify this implicitly: if the import succeeds without a vscode mock,
+// the module is truly standalone.
+
+describe("mcpStandalone", () => {
+  let tmpDir: string;
+  let guideDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "nlv-test-"));
+    guideDir = path.join(tmpDir, ".codebase-guide");
+    fs.mkdirSync(guideDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  describe("createStandaloneMcpServer", () => {
+    it("creates without importing vscode", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      expect(server).toBeDefined();
+    });
+
+    it("registers all 10 tools", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const names = mod.getStandaloneToolNames();
+      expect(names).toHaveLength(10);
+      expect(names).toContain("highlight_range");
+      expect(names).toContain("clear_highlights");
+      expect(names).toContain("open_file");
+      expect(names).toContain("mark_read");
+      expect(names).toContain("mark_flagged");
+      expect(names).toContain("set_codelens");
+      expect(names).toContain("show_blast_radius");
+      expect(names).toContain("clear_blast_radius");
+      expect(names).toContain("update_progress_tree");
+      expect(names).toContain("clear_all");
+      // Ensure server was created (suppress unused-variable lint)
+      expect(server).toBeDefined();
+    });
+  });
+
+  describe("mark_read tool", () => {
+    it("creates progress.json and marks file as confirmed", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "mark_read", {
+        path: "src/config.ts",
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0].text).toContain("src/config.ts");
+      expect(result.content[0].text).toContain("confirmed");
+
+      // Verify progress.json was written
+      const progressPath = path.join(guideDir, "progress.json");
+      expect(fs.existsSync(progressPath)).toBe(true);
+
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      expect(progress.files["src/config.ts"].status).toBe("confirmed");
+      expect(progress.files["src/config.ts"].read_at).toBeDefined();
+    });
+
+    it("updates existing progress.json without overwriting other entries", async () => {
+      // Write an initial progress.json
+      const progressPath = path.join(guideDir, "progress.json");
+      const initial = {
+        version: "1.0.0",
+        files: {
+          "src/other.ts": {
+            status: "flagged",
+            read_at: "2026-04-04T10:00:00Z",
+            note: "check later",
+          },
+        },
+        stats: { total: 0, confirmed: 0, flagged: 1, skimmed: 0, unread: 0 },
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(initial));
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_read", { path: "src/config.ts" });
+
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      expect(progress.files["src/other.ts"].status).toBe("flagged");
+      expect(progress.files["src/config.ts"].status).toBe("confirmed");
+    });
+  });
+
+  describe("mark_flagged tool", () => {
+    it("marks file as flagged with reason", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "mark_flagged", {
+        path: "src/auth.ts",
+        reason: "Dual token store seems unnecessary",
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.content[0].text).toContain("src/auth.ts");
+      expect(result.content[0].text).toContain("flagged");
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      expect(progress.files["src/auth.ts"].status).toBe("flagged");
+      expect(progress.files["src/auth.ts"].note).toBe(
+        "Dual token store seems unnecessary",
+      );
+    });
+  });
+
+  describe("show_blast_radius tool", () => {
+    it("returns affected files from dependency graph", async () => {
+      // Write a map.json with a dependency graph
+      const mapJson = {
+        version: "1.0.0",
+        repo_root: tmpDir,
+        generated_at: "2026-04-04T10:00:00Z",
+        content_hashes: {},
+        total_files: 3,
+        layers: {
+          foundation: { description: "base", files: ["src/config.ts"] },
+          core: { description: "core", files: ["src/db.ts"] },
+          features: { description: "feat", files: ["src/api.ts"] },
+          integration: { description: "int", files: [] },
+          entry: { description: "entry", files: [] },
+        },
+        reading_order: [
+          {
+            index: 0,
+            path: "src/config.ts",
+            layer: "foundation",
+            reason: "base",
+            complexity: "low",
+            line_count: 10,
+            imports: [],
+            imported_by: ["src/db.ts"],
+            exports: ["AppConfig"],
+          },
+          {
+            index: 1,
+            path: "src/db.ts",
+            layer: "core",
+            reason: "core",
+            complexity: "medium",
+            line_count: 50,
+            imports: ["src/config.ts"],
+            imported_by: ["src/api.ts"],
+            exports: ["query"],
+          },
+          {
+            index: 2,
+            path: "src/api.ts",
+            layer: "features",
+            reason: "feat",
+            complexity: "medium",
+            line_count: 80,
+            imports: ["src/db.ts"],
+            imported_by: [],
+            exports: ["handleRequest"],
+          },
+        ],
+        dependency_graph: {
+          "src/config.ts": {
+            imports: [],
+            imported_by: ["src/db.ts"],
+          },
+          "src/db.ts": {
+            imports: ["src/config.ts"],
+            imported_by: ["src/api.ts"],
+          },
+          "src/api.ts": {
+            imports: ["src/db.ts"],
+            imported_by: [],
+          },
+        },
+      };
+      fs.writeFileSync(
+        path.join(guideDir, "map.json"),
+        JSON.stringify(mapJson),
+      );
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "show_blast_radius", {
+        symbol: "AppConfig",
+      });
+
+      expect(result.isError).not.toBe(true);
+      const text = result.content[0].text;
+      // AppConfig is exported by src/config.ts
+      // Blast radius: src/db.ts -> src/api.ts (transitive)
+      expect(text).toContain("src/config.ts");
+      expect(text).toContain("src/db.ts");
+      expect(text).toContain("src/api.ts");
+    });
+
+    it("returns error when symbol is not found", async () => {
+      // Empty map
+      const mapJson = {
+        version: "1.0.0",
+        repo_root: tmpDir,
+        generated_at: "2026-04-04T10:00:00Z",
+        content_hashes: {},
+        total_files: 0,
+        layers: {
+          foundation: { description: "", files: [] },
+          core: { description: "", files: [] },
+          features: { description: "", files: [] },
+          integration: { description: "", files: [] },
+          entry: { description: "", files: [] },
+        },
+        reading_order: [],
+        dependency_graph: {},
+      };
+      fs.writeFileSync(
+        path.join(guideDir, "map.json"),
+        JSON.stringify(mapJson),
+      );
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "show_blast_radius", {
+        symbol: "nonExistent",
+      });
+
+      expect(result.content[0].text).toContain("not found");
+    });
+
+    it("returns error when map.json does not exist", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "show_blast_radius", {
+        symbol: "something",
+      });
+
+      expect(result.content[0].text).toContain(
+        "map.json not found",
+      );
+    });
+  });
+
+  describe("update_progress_tree tool", () => {
+    it("returns progress stats from progress.json", async () => {
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = {
+        version: "1.0.0",
+        files: {
+          "src/a.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+          "src/b.ts": { status: "flagged", read_at: "2026-04-04T10:00:00Z", note: "check" },
+          "src/c.ts": { status: "skimmed", read_at: "2026-04-04T10:00:00Z" },
+        },
+        stats: { total: 5, confirmed: 1, flagged: 1, skimmed: 1, unread: 2 },
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(progress));
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "update_progress_tree", {});
+
+      expect(result.isError).not.toBe(true);
+      const text = result.content[0].text;
+      expect(text).toContain("confirmed");
+      expect(text).toContain("flagged");
+      expect(text).toContain("skimmed");
+    });
+
+    it("returns message when no progress.json exists", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "update_progress_tree", {});
+
+      expect(result.content[0].text).toContain("No progress");
+    });
+  });
+
+  describe("open_file tool", () => {
+    it("returns opened status with path and line", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "open_file", {
+        path: "src/config.ts",
+        line: 42,
+      });
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.opened).toBe(true);
+      expect(parsed.path).toBe("src/config.ts");
+      expect(parsed.line).toBe(42);
+    });
+
+    it("returns opened status without line", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "open_file", {
+        path: "src/config.ts",
+      });
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.opened).toBe(true);
+      expect(parsed.path).toBe("src/config.ts");
+      expect(parsed.line).toBeUndefined();
+    });
+  });
+
+  describe("extension-only tools return success gracefully", () => {
+    it("highlight_range returns success with note", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "highlight_range", {
+        file: "src/main.ts",
+        startLine: 10,
+        endLine: 20,
+        style: "focus",
+      });
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.note).toContain("VS Code extension");
+    });
+
+    it("clear_highlights returns success", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "clear_highlights", {});
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+    });
+
+    it("set_codelens returns success with note", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "set_codelens", {
+        file: "src/main.ts",
+        entries: [{ line: 1, text: "Called by: foo.ts" }],
+      });
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+      expect(parsed.note).toContain("VS Code extension");
+    });
+
+    it("clear_blast_radius returns success", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "clear_blast_radius", {});
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+    });
+
+    it("clear_all returns success", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "clear_all", {});
+
+      expect(result.isError).not.toBe(true);
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.success).toBe(true);
+    });
+  });
+});
+
+/**
+ * Helper to invoke a tool handler directly on the McpServer,
+ * bypassing MCP protocol transport for unit testing.
+ */
+async function callTool(
+  server: { server: unknown },
+  toolName: string,
+  args: Record<string, unknown>,
+): Promise<{
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+}> {
+  // Access the registered tools through the server's internal state.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const registeredTools = (server.server as any)._registeredTools as Record<
+    string,
+    {
+      handler: (
+        args: Record<string, unknown>,
+        extra: unknown,
+      ) => Promise<unknown>;
+    }
+  >;
+
+  const tool = registeredTools[toolName];
+  if (!tool) {
+    throw new Error(`Tool '${toolName}' not registered`);
+  }
+
+  const result = await tool.handler(args, {});
+  return result as {
+    content: Array<{ type: string; text: string }>;
+    isError?: boolean;
+  };
+}

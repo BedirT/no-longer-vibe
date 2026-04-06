@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} -- Codebase Overview</title>
+<style>
+  /* ── Design tokens ─────────────────────────────────
+     Pastel layer palette, warm neutrals, Claude-inspired.
+     OKLCH for perceptual uniformity. Modular scale 1.25. */
+  :root {
+    /* Layer palette — soft pastels, distinguishable under deuteranopia */
+    --c-foundation: oklch(72% 0.08 192);  /* muted teal */
+    --c-core: oklch(68% 0.04 260);        /* cool slate */
+    --c-features: oklch(78% 0.10 75);     /* warm sand */
+    --c-integration: oklch(72% 0.08 18);  /* dusty rose */
+    --c-entry: oklch(74% 0.03 250);       /* quiet lavender */
+
+    /* Pass palette — differentiated from layers */
+    --c-pass1: oklch(72% 0.07 240);  /* soft blue */
+    --c-pass2: oklch(76% 0.09 70);   /* warm amber */
+    --c-pass3: oklch(74% 0.08 155);  /* sage green */
+
+    /* Surfaces — warm off-whites, never stark */
+    --c-bg: oklch(98.5% 0.005 80);
+    --c-bg-alt: oklch(96% 0.008 70);
+    --c-bg-dark: oklch(18% 0.01 260);
+    --c-card: oklch(99% 0.003 80);
+
+    /* Text — tinted, never pure black or pure gray */
+    --c-text: oklch(22% 0.01 260);
+    --c-text-secondary: oklch(50% 0.015 260);
+    --c-text-tertiary: oklch(62% 0.01 260);
+
+    /* Borders & accents */
+    --c-border: oklch(90% 0.008 80);
+    --c-border-subtle: oklch(93% 0.005 80);
+
+    /* Typography — modular scale 1.25, rem-based */
+    --font-sans: "Instrument Sans", -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", system-ui, sans-serif;
+    --font-mono: "Berkeley Mono", "SF Mono", ui-monospace, "Cascadia Mono",
+                 "Fira Code", Menlo, monospace;
+    --text-xs: 0.75rem;     /* 12px — captions */
+    --text-sm: 0.875rem;    /* 14px — secondary */
+    --text-base: 1rem;      /* 16px — body */
+    --text-md: 1.125rem;    /* 18px — subheading */
+    --text-lg: 1.25rem;     /* 20px — section title */
+    --text-xl: 1.5rem;      /* 24px — large heading */
+    --text-2xl: 2rem;       /* 32px — page title */
+
+    /* Spacing — 4px base, consistent rhythm */
+    --sp-1: 0.25rem;  --sp-2: 0.5rem;   --sp-3: 0.75rem;
+    --sp-4: 1rem;     --sp-5: 1.25rem;  --sp-6: 1.5rem;
+    --sp-8: 2rem;     --sp-10: 2.5rem;  --sp-12: 3rem;
+    --sp-16: 4rem;
+
+    /* Layout */
+    --max-w: 56rem;  /* 896px — comfortable reading width */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --c-bg: oklch(14% 0.01 260);
+      --c-bg-alt: oklch(17% 0.012 260);
+      --c-bg-dark: oklch(10% 0.01 260);
+      --c-card: oklch(19% 0.01 260);
+      --c-text: oklch(90% 0.008 80);
+      --c-text-secondary: oklch(68% 0.01 80);
+      --c-text-tertiary: oklch(52% 0.008 80);
+      --c-border: oklch(26% 0.01 260);
+      --c-border-subtle: oklch(22% 0.008 260);
+    }
+  }
+
+  /* ── Reset & base ──────────────────────────────────── */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    color: var(--c-text);
+    background: var(--c-bg);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "kern" 1, "liga" 1;
+  }
+
+  code, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Zone 1: Identity ─────────────────────────────── */
+  .identity {
+    background: var(--c-bg-alt);
+    padding: var(--sp-16) var(--sp-8) var(--sp-12);
+    border-bottom: 1px solid var(--c-border-subtle);
+  }
+  .identity-inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+  }
+  .project-name {
+    font-size: var(--text-2xl);
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    margin-bottom: var(--sp-2);
+  }
+  .project-desc {
+    font-size: var(--text-md);
+    color: var(--c-text-secondary);
+    line-height: 1.5;
+    margin-bottom: var(--sp-8);
+    max-width: 42rem;
+  }
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-1) var(--sp-3);
+    border-radius: 100px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    background: var(--c-border);
+    color: var(--c-text-secondary);
+    letter-spacing: 0.01em;
+  }
+  .stat-badge .num {
+    font-weight: 650;
+    font-family: var(--font-mono);
+    color: var(--c-text);
+  }
+
+  /* ── Zone 2: The Map ──────────────────────────────── */
+  .map-section {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-16) var(--sp-8);
+  }
+  .section-title {
+    font-size: var(--text-lg);
+    font-weight: 620;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+    margin-bottom: var(--sp-1);
+    color: var(--c-text);
+  }
+  .section-subtitle {
+    font-size: var(--text-sm);
+    color: var(--c-text-tertiary);
+    margin-bottom: var(--sp-8);
+    letter-spacing: 0.005em;
+  }
+
+  /* Layer bar */
+  .layer-bar-container { margin-bottom: var(--sp-10); }
+  .layer-bar {
+    width: 100%;
+    height: 40px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    display: flex;
+    cursor: default;
+  }
+  .layer-bar-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: oklch(99% 0 0);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: filter 0.2s ease;
+    position: relative;
+    min-width: 2%;
+  }
+  .layer-bar-seg:hover { filter: brightness(0.92); }
+  .layer-bar-seg .seg-label { pointer-events: none; }
+  .layer-bar-seg .seg-label.hidden { display: none; }
+
+  /* Layer detail table */
+  .layer-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+  .layer-table th {
+    text-align: left;
+    font-weight: 550;
+    color: var(--c-text-tertiary);
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--c-border);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .layer-table td {
+    padding: var(--sp-3) var(--sp-3);
+    border-bottom: 1px solid var(--c-border-subtle);
+    vertical-align: baseline;
+  }
+  .layer-table tr:last-child td { border-bottom: none; }
+  .layer-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: var(--sp-2);
+    vertical-align: middle;
+  }
+  .layer-name { font-weight: 550; }
+  .layer-count {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Two-column layout for features + backbone */
+  .map-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--sp-12);
+    margin-top: var(--sp-16);
+  }
+  @media (max-width: 48rem) {
+    .map-columns { grid-template-columns: 1fr; }
+  }
+
+  /* Feature area cards */
+  .feature-cards { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .feature-card {
+    background: var(--c-card);
+    border: 1px solid var(--c-border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4) var(--sp-5);
+    border-left: 3px solid var(--c-text-tertiary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .feature-card:hover {
+    border-left-color: var(--c-features);
+    box-shadow: 0 1px 4px oklch(0% 0 0 / 0.04);
+  }
+  .feature-card-name {
+    font-weight: 600;
+    font-size: var(--text-base);
+    margin-bottom: var(--sp-1);
+    line-height: 1.3;
+  }
+  .feature-card-meta {
+    font-size: var(--text-sm);
+    color: var(--c-text-secondary);
+    margin-bottom: var(--sp-2);
+  }
+  .feature-card-files {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--c-text-tertiary);
+    line-height: 1.6;
+  }
+  .feature-card .layer-dots {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: var(--sp-2);
+    vertical-align: middle;
+  }
+  .feature-card .layer-dots .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Backbone */
+  .backbone-list { display: flex; flex-direction: column; gap: var(--sp-4); }
+  .backbone-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+  .backbone-bar-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+  .backbone-file {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--c-text);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 1px var(--sp-1);
+    transition: background 0.15s ease;
+  }
+  .backbone-file:hover {
+    background: var(--c-border);
+  }
+  .backbone-bar-wrap {
+    flex: 1;
+    height: 16px;
+    background: var(--c-border-subtle);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .backbone-bar-fill {
+    height: 100%;
+    border-radius: var(--radius-sm);
+  }
+  .backbone-dep-count {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 650;
+    min-width: 3rem;
+    text-align: right;
+    color: var(--c-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+  .backbone-desc {
+    font-size: var(--text-xs);
+    color: var(--c-text-tertiary);
+    margin-top: var(--sp-1);
+    padding-left: var(--sp-3);
+    line-height: 1.4;
+  }
+
+  /* ── Zone 3: Your Path ────────────────────────────── */
+  .path-section {
+    background: var(--c-bg-alt);
+    padding: var(--sp-16) var(--sp-8) var(--sp-16);
+    border-top: 1px solid var(--c-border-subtle);
+  }
+  .path-inner {
+    max-width: var(--max-w);
+    margin: 0 auto;
+  }
+
+  /* Journey track */
+  .journey-track-wrap { margin-bottom: var(--sp-12); }
+  .journey-track {
+    width: 100%;
+    height: 44px;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+  }
+  .journey-seg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: oklch(99% 0 0);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    position: relative;
+    transition: filter 0.2s ease;
+    letter-spacing: 0.01em;
+  }
+  .journey-seg:hover { filter: brightness(0.92); }
+  .journey-labels {
+    display: flex;
+    margin-top: var(--sp-2);
+  }
+  .journey-label {
+    font-size: var(--text-xs);
+    color: var(--c-text-tertiary);
+    text-align: center;
+  }
+
+  /* Milestones */
+  .milestones {
+    display: flex;
+    justify-content: space-between;
+    margin-top: var(--sp-6);
+    gap: var(--sp-4);
+  }
+  .milestone {
+    flex: 1;
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--c-text-secondary);
+    border-top: 2px dashed var(--c-border);
+    padding-top: var(--sp-3);
+    line-height: 1.5;
+  }
+  .milestone strong {
+    display: block;
+    font-weight: 600;
+    font-style: normal;
+    color: var(--c-text);
+    font-size: var(--text-sm);
+    margin-bottom: var(--sp-1);
+  }
+
+  /* First files */
+  .first-files { margin-top: var(--sp-12); }
+  .first-files-title {
+    font-size: var(--text-base);
+    font-weight: 600;
+    margin-bottom: var(--sp-4);
+  }
+  .first-file {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    padding: var(--sp-3) 0;
+    border-bottom: 1px solid var(--c-border-subtle);
+  }
+  .first-file:last-child { border-bottom: none; }
+  .first-file-num {
+    font-family: var(--font-mono);
+    font-weight: 650;
+    font-size: var(--text-sm);
+    color: var(--c-text-tertiary);
+    min-width: 1.5rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .first-file-path {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 1px var(--sp-1);
+    transition: background 0.15s ease;
+  }
+  .first-file-path:hover { background: var(--c-border); }
+  .first-file-reason {
+    font-size: var(--text-sm);
+    color: var(--c-text-secondary);
+  }
+
+  /* Heads up */
+  .heads-up {
+    margin-top: var(--sp-8);
+    padding: var(--sp-5) var(--sp-6);
+    background: var(--c-card);
+    border: 1px solid var(--c-border-subtle);
+    border-left: 3px solid var(--c-pass2);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--c-text-secondary);
+    line-height: 1.65;
+  }
+
+  /* CTA */
+  .cta {
+    margin-top: var(--sp-12);
+    background: var(--c-bg-dark);
+    color: oklch(88% 0.01 80);
+    padding: var(--sp-5) var(--sp-8);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+  .cta .prompt { color: var(--c-pass3); }
+  .cta .cmd { color: oklch(80% 0.06 240); font-weight: 600; }
+
+  /* Footer */
+  .footer {
+    max-width: var(--max-w);
+    margin: 0 auto;
+    padding: var(--sp-8) var(--sp-8);
+    font-size: var(--text-xs);
+    color: var(--c-text-tertiary);
+    text-align: center;
+    letter-spacing: 0.01em;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius-md);
+    padding: var(--sp-3) var(--sp-4);
+    font-size: var(--text-sm);
+    box-shadow: 0 4px 16px oklch(0% 0 0 / 0.08),
+                0 1px 3px oklch(0% 0 0 / 0.04);
+    pointer-events: none;
+    z-index: 100;
+    max-width: 18rem;
+    display: none;
+    line-height: 1.45;
+  }
+  .tooltip-title {
+    font-weight: 600;
+    margin-bottom: var(--sp-1);
+    color: var(--c-text);
+  }
+  .tooltip-body { color: var(--c-text-secondary); }
+
+  /* Resuming banner */
+  .resuming-banner {
+    background: oklch(94% 0.03 75);
+    border-bottom: 1px solid oklch(88% 0.04 75);
+    padding: var(--sp-3) var(--sp-8);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--c-text-secondary);
+    font-weight: 500;
+  }
+  .resuming-banner strong {
+    font-weight: 650;
+    color: var(--c-text);
+  }
+  @media (prefers-color-scheme: dark) {
+    .resuming-banner {
+      background: oklch(22% 0.02 75);
+      border-bottom-color: oklch(28% 0.02 75);
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- {{RESUMING_BANNER}} -->
+
+<!-- ── Zone 1: Identity ─────────────────────────────── -->
+<div class="identity">
+  <div class="identity-inner">
+    <div class="project-name">{{PROJECT_NAME}}</div>
+    <div class="project-desc">{{PROJECT_DESCRIPTION}}</div>
+    <div class="stat-row">
+      <span class="stat-badge"><span class="num">{{TOTAL_FILES}}</span> files</span>
+      <span class="stat-badge">~<span class="num">{{TOTAL_LINES}}</span> lines</span>
+      <span class="stat-badge">{{LANGUAGE}}</span>
+      <span class="stat-badge">{{FRAMEWORK}}</span>
+      <span class="stat-badge">{{PACKAGE_MANAGER}}</span>
+      <!-- {{KEY_DEPS_BADGES}} -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Zone 2: The Map ──────────────────────────────── -->
+<div class="map-section">
+  <div class="section-title">Layers</div>
+  <div class="section-subtitle">How the code is organized by dependency depth</div>
+
+  <div class="layer-bar-container">
+    <div class="layer-bar">
+      <!-- {{LAYER_BAR_SEGMENTS}} -->
+    </div>
+  </div>
+
+  <table class="layer-table">
+    <thead>
+      <tr><th>Layer</th><th>Files</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <!-- {{LAYER_TABLE_ROWS}} -->
+    </tbody>
+  </table>
+
+  <div class="map-columns">
+    <div>
+      <div class="section-title">Feature Areas</div>
+      <div class="section-subtitle">What the app does, as vertical slices</div>
+      <div class="feature-cards">
+        <!-- {{FEATURE_AREA_CARDS}} -->
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Backbone</div>
+      <div class="section-subtitle">The load-bearing files everything connects through</div>
+      <div class="backbone-list">
+        <!-- {{BACKBONE_ITEMS}} -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Zone 3: Your Path ────────────────────────────── -->
+<div class="path-section">
+  <div class="path-inner">
+    <div class="section-title">Your Reading Path</div>
+    <div class="section-subtitle">3 passes, ~{{ESTIMATED_SESSIONS}} sessions at 35 files each</div>
+
+    <div class="journey-track-wrap">
+      <div class="journey-track">
+        <!-- {{JOURNEY_SEGMENTS}} -->
+      </div>
+      <div class="journey-labels">
+        <!-- {{JOURNEY_LABELS}} -->
+      </div>
+      <div class="milestones">
+        <!-- {{MILESTONES}} -->
+      </div>
+    </div>
+
+    <div class="first-files">
+      <div class="first-files-title">Starting with</div>
+      <!-- {{FIRST_FILES}} -->
+    </div>
+
+    <!-- {{HEADS_UP}} -->
+
+    <div class="cta">
+      <span class="prompt">$</span> <span class="cmd">/read-next</span> to begin reading
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Generated by No Longer Vibe &middot; {{GENERATED_AT}}
+</div>
+
+<!-- Shared tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div class="tooltip-body" id="tooltip-body"></div>
+</div>
+
+<script>
+/* ── Tooltip (shared) ─────────────────────────────── */
+const tip = document.getElementById('tooltip');
+const tipT = document.getElementById('tooltip-title');
+const tipB = document.getElementById('tooltip-body');
+
+document.addEventListener('mousemove', e => {
+  if (tip.style.display !== 'block') return;
+  const x = Math.min(e.clientX + 12, window.innerWidth - 304);
+  const y = Math.max(e.clientY - tip.offsetHeight - 8, 8);
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+});
+
+document.querySelectorAll('[data-tip-title]').forEach(el => {
+  el.addEventListener('mouseenter', () => {
+    tipT.textContent = el.dataset.tipTitle;
+    tipB.textContent = el.dataset.tipBody || '';
+    tip.style.display = 'block';
+  });
+  el.addEventListener('mouseleave', () => tip.style.display = 'none');
+});
+
+/* ── Click-to-copy on file paths ──────────────────── */
+document.querySelectorAll('.backbone-file, .first-file-path').forEach(el => {
+  el.title = 'Click to copy';
+  el.addEventListener('click', () => {
+    const text = el.textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = el.textContent;
+      el.textContent = 'copied';
+      el.style.opacity = '0.6';
+      setTimeout(() => { el.textContent = orig; el.style.opacity = ''; }, 900);
+    });
+  });
+});
+</script>
+
+<!--
+  TEMPLATE REFERENCE — how Claude populates each placeholder:
+
+  Layer bar segment:
+    <div class="layer-bar-seg" style="width:24.7%;background:var(--c-foundation)"
+         data-tip-title="foundation — 117 files (24.7%)"
+         data-tip-body="No or minimal internal dependencies">
+      <span class="seg-label">foundation 117</span>
+    </div>
+
+  Layer table row:
+    <tr>
+      <td><span class="layer-dot" style="background:var(--c-foundation)"></span>
+          <span class="layer-name">foundation</span></td>
+      <td><span class="layer-count">117</span></td>
+      <td>domain value objects, token primitives, enums</td>
+    </tr>
+
+  Feature card:
+    <div class="feature-card" style="border-left-color:var(--c-features)">
+      <div class="feature-card-name">Token Catalog
+        <span class="layer-dots">
+          <span class="dot" style="background:var(--c-foundation)"></span>
+          <span class="dot" style="background:var(--c-features)"></span>
+        </span>
+      </div>
+      <div class="feature-card-meta">~60 files across foundation, features</div>
+      <div class="feature-card-files">tokens.py, token_catalog/models.py</div>
+    </div>
+
+  Backbone item:
+    <div>
+      <div class="backbone-item">
+        <div class="backbone-bar-container">
+          <span class="backbone-file">context.py</span>
+          <div class="backbone-bar-wrap">
+            <div class="backbone-bar-fill" style="width:100%;background:var(--c-foundation)"></div>
+          </div>
+        </div>
+        <span class="backbone-dep-count">49 deps</span>
+      </div>
+      <div class="backbone-desc">Immutable execution scope</div>
+    </div>
+
+  Journey segment:
+    <div class="journey-seg" style="flex-grow:182;background:var(--c-pass1)"
+         data-tip-title="Pass 1: Contracts — 182 files"
+         data-tip-body="Types, interfaces, public APIs">
+      Contracts (182)
+    </div>
+
+  Milestone:
+    <div class="milestone">
+      <strong>After session 5</strong>
+      All type definitions and contracts read
+    </div>
+
+  First file:
+    <div class="first-file">
+      <span class="first-file-num">1.</span>
+      <span class="first-file-path">domain/value_objects/context.py</span>
+      <span class="first-file-reason">Root value object, 49 dependents</span>
+    </div>
+
+  Heads-up:
+    <div class="heads-up">
+      Sessions 1–3 are the densest — 117 foundation files define
+      the vocabulary for everything else.
+    </div>
+
+  Resuming banner (if progress.json exists):
+    <div class="resuming-banner">
+      Resuming: <strong>214 / 387 files</strong> read (55%).
+      Next file: src/components/Dashboard.tsx
+    </div>
+-->
+</body>
+</html>

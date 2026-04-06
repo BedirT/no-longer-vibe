@@ -4,7 +4,7 @@
   "description": "Deterministic codebase comprehension tool — read your AI-generated codebase in smart order with progress tracking.",
   "version": "0.1.0",
   "publisher": "no-longer-vibe",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/BedirT/no-longer-vibe.git"
@@ -78,7 +78,7 @@
     ]
   },
   "scripts": {
-    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "build": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap && esbuild ./src/mcpStandalone.ts --bundle --outfile=dist/mcpStandalone.js --format=cjs --platform=node --sourcemap",
     "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "lint": "eslint src/ test/ --ext .ts",
     "test": "vitest run",

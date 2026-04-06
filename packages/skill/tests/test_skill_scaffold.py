@@ -18,6 +18,7 @@ REPO_ROOT = SKILL_PKG.parent.parent
 EXPECTED_COMMANDS = [
     "read-index",
     "read-next",
+    "read-overview",
     "read-status",
     "read-flagged",
     "read-refresh",

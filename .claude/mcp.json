@@ -2,7 +2,7 @@
   "mcpServers": {
     "no-longer-vibe": {
       "command": "node",
-      "args": ["packages/extension/dist/mcpServer.js"],
+      "args": ["packages/extension/dist/mcpStandalone.js"],
       "type": "stdio"
     }
   }
