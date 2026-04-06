@@ -357,3 +357,49 @@ class TestCustomPassOverrides:
         # "src/**" sorts before "src/types/**", so it wins
         result = match_custom_pass_override("src/types/user.py", cfg)
         assert result == "data_flow"
+
+
+# ---------------------------------------------------------------------------
+# exclude_from_reading
+# ---------------------------------------------------------------------------
+
+
+class TestExcludeFromReading:
+    """Tests for the exclude_from_reading config option."""
+
+    def test_default_is_empty(self) -> None:
+        cfg = ReadingConfig()
+        assert cfg.exclude_from_reading == ()
+
+    def test_custom_patterns(self) -> None:
+        cfg = ReadingConfig(
+            exclude_from_reading=("**/__init__.py", "**/__main__.py"),
+        )
+        assert len(cfg.exclude_from_reading) == 2
+
+    def test_load_from_json(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.json").write_text(json.dumps({
+            "exclude_from_reading": ["**/__init__.py"],
+        }))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ("**/__init__.py",)
+
+    def test_load_from_toml(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.toml").write_text(textwrap.dedent("""\
+            exclude_from_reading = ["**/__init__.py", "conftest.py"]
+        """))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ("**/__init__.py", "conftest.py")
+
+    def test_missing_key_defaults_to_empty(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.json").write_text(json.dumps({
+            "skip_tests": False,
+        }))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ()
