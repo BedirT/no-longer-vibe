@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from nlv.graph import DependencyGraph
+from nlv.graph import DependencyGraph, SymbolUsageEntry
 from nlv.layers import Layer, LayerClassification
 from nlv.reading_order import ReadingOrderEntry
 
@@ -71,7 +71,7 @@ def generate_map_json(
         "dependency_graph": _build_dependency_graph(graph),
         "generated_at": _utc_timestamp(),
         "layers": _build_layers(classification),
-        "reading_order": _build_reading_order(reading_order),
+        "reading_order": _build_reading_order(reading_order, graph.symbol_usage),
         "repo_root": repo_root,
         "total_files": len(graph.nodes),
         "version": _MAP_VERSION,
@@ -153,12 +153,16 @@ def _build_layers(
 
 def _build_reading_order(
     reading_order: tuple[ReadingOrderEntry, ...],
+    symbol_usage: dict[str, dict[str, SymbolUsageEntry]],
 ) -> list[dict[str, object]]:
     """Build the ``reading_order`` section of map.json."""
-    return [_entry_to_dict(entry) for entry in reading_order]
+    return [_entry_to_dict(entry, symbol_usage) for entry in reading_order]
 
 
-def _entry_to_dict(entry: ReadingOrderEntry) -> dict[str, object]:
+def _entry_to_dict(
+    entry: ReadingOrderEntry,
+    symbol_usage: dict[str, dict[str, SymbolUsageEntry]],
+) -> dict[str, object]:
     """Convert a ReadingOrderEntry to a JSON-serializable dict."""
     return {
         "complexity": entry.complexity,
@@ -170,6 +174,19 @@ def _entry_to_dict(entry: ReadingOrderEntry) -> dict[str, object]:
         "line_count": entry.line_count,
         "path": entry.path,
         "reason": entry.reason,
+        "symbol_usage": _symbol_usage_to_dict(
+            symbol_usage.get(entry.path, {}),
+        ),
+    }
+
+
+def _symbol_usage_to_dict(
+    usage: dict[str, SymbolUsageEntry],
+) -> dict[str, dict[str, object]]:
+    """Convert per-file symbol usage to a JSON-serializable dict."""
+    return {
+        name: {"callers": entry.callers, "used_by": list(entry.used_by)}
+        for name, entry in sorted(usage.items())
     }
 
 
