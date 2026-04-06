@@ -12,19 +12,13 @@ Print the current reading progress.
 ## Prerequisites
 
 - `.codebase-guide/map.json` must exist
-- `.codebase-guide/progress.json` must exist (run `/read-next` at least
-  once)
+- The `no-longer-vibe` MCP server must be connected
 
 ## Behavior
 
-1. Load `map.json` and `progress.json`.
-2. Compute stats from `progress.json`:
-   - Total files, confirmed, flagged, skimmed, unread counts
-   - Current layer and its completion percentage
-   - Next file in reading order
-   - Number of flagged files awaiting second pass
-   - Session count and average pace
-3. Display the progress report:
+1. Call the `get_read_status` MCP tool (no parameters).
+2. If the result has `"status": "error"`, display the error message.
+3. Format and display the progress report:
    ```
    Progress: <confirmed+flagged+skimmed>/<total> files (<pct>%)
      confirmed: <n>
@@ -32,23 +26,17 @@ Print the current reading progress.
      skimmed: <n>
      unread: <n>
 
-   Current layer: <layer> (<pct>% complete)
-   Next file: <filepath>
-   Flagged files awaiting second pass: <n>
+   Current layer: <current_layer> (<current_layer_pct>% complete)
+   Next file: <next_file>
+   Flagged files awaiting second pass: <flagged_count>
 
-   Sessions: <n> | Avg pace: ~<n> files/session
+   Sessions: <sessions>
    ```
 
-## Implementation
+## IMPORTANT: Do NOT Read JSON Files Directly
 
-Run the Python formatter via:
-
-```bash
-uv run python -c "from nlv.read_status import format_read_status; from pathlib import Path; print(format_read_status(Path('.codebase-guide')))"
-```
-
-The `format_read_status(guide_dir)` function handles all edge cases
-and returns a formatted string ready to display.
+Do NOT read `.codebase-guide/map.json` or `.codebase-guide/progress.json`
+into the conversation. All data comes from the `get_read_status` MCP tool.
 
 ## Edge Cases
 

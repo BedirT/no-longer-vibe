@@ -7,120 +7,84 @@ triggers:
 
 # /read-next
 
-Show the next unread file in reading order. Provide structural context
-from `map.json`, then read the actual file content into the conversation.
+Show the next unread file in reading order. Provide structural context,
+then read the actual file content into the conversation.
 
 ## Prerequisites
 
 - `.codebase-guide/map.json` must exist (run `/read-index` first)
-- `.codebase-guide/progress.json` is created automatically on first use
+- The `no-longer-vibe` MCP server must be connected (configured in
+  `.claude/mcp.json`)
 
 ## Behavior
 
-1. Load `map.json` and `progress.json` (create `progress.json` if it
-   does not exist).
-2. Find the next file in `reading_order` whose status is `unread`.
-3. Display the structural briefing:
+1. Call the `get_next_briefing` MCP tool (no parameters). This returns
+   all context needed without loading map.json or progress.json into
+   the conversation.
+2. If the result has `"status": "all_read"`, congratulate the user and
+   show final stats from the `progress` field.
+3. If the result has `"status": "error"`, display the error message
+   and suggest running `/read-index`.
+4. Display the structural briefing from the tool response:
    ```
-   -- Next: <filepath> ---------------------------------
-   Layer: <layer> | Lines: <n> | Complexity: <level>
+   -- Next: <path> ---------------------------------
+   Layer: <layer> | Lines: <line_count> | Complexity: <complexity>
 
-   Why now: All dependencies read.
-     <status_icon> <dep_path> (<status>)
+   Why now: <reason>
+     <status_icon> <import.path> (<import.status>)
      ...
 
-   Exports: <export1>, <export2>, ...
-   Used by: <path1>, <path2> (unread, later)
+   Exports: <exports joined>
+   Used by: <imported_by joined>
    --------------------------------------------------
    ```
-4. Build session priming context: compressed summaries of previously
-   read files that this file imports.
+   Where `<status_icon>` is: confirmed=check, flagged=warning,
+   skimmed=eye-closed, unread=circle.
+   Include import summaries inline when available.
 5. Read the actual file content into the conversation.
 6. Wait for the user's response:
-   - `done` / `next` / `confirmed` -> mark file as `confirmed`
-   - `flag <reason>` -> mark file as `flagged` with the reason
-   - `skim` / `skimmed` -> mark file as `skimmed`
+   - `done` / `next` / `confirmed` -> call `complete_file` MCP tool
+     with `status: "confirmed"` and a one-line summary
+   - `flag <reason>` -> call `complete_file` with `status: "flagged"`,
+     `note: <reason>`, and a one-line summary
+   - `skim` / `skimmed` -> call `complete_file` with
+     `status: "skimmed"`
    - Any other message -> treat as a question about the current file,
      answer it, then wait again
-7. Update `progress.json` atomically after each status change.
-8. When the user confirms/flags/skims, immediately show the briefing
-   for the next file (loop).
+7. If the user does not provide a summary, generate a one-line summary
+   when marking the file done.
+8. After completing a file, immediately call `get_next_briefing` again
+   and show the next file (loop).
 
-## Context Window Strategy
+## IMPORTANT: Do NOT Read JSON Files Directly
 
-- At session start, feed compressed context: list of previously read
-  files with their one-line summaries.
-- Always include structural data from `map.json` (imports, callers,
-  layer) — it is small and deterministic.
-- If the user does not provide a summary, generate a one-line summary
-  when marking the file done.
+Do NOT read `.codebase-guide/map.json` or `.codebase-guide/progress.json`
+into the conversation. These files can be very large and waste context
+window tokens. All data needed for briefings comes from the
+`get_next_briefing` MCP tool, and all status updates go through the
+`complete_file` MCP tool.
 
 ## VS Code Extension Integration (MCP Tools)
 
 When the No Longer Vibe VS Code extension is installed and connected,
-MCP tools are available to enhance the reading experience. Use them
-conditionally — **always check if a tool is available before calling it**.
-The skill must work without MCP (text-only fallback is the default).
-
-### Tool Detection
-
-Before using any MCP tool, check whether it exists in the current
-tool set. If the `open_file` tool is not available, the extension is
-not connected — skip all MCP calls and proceed in text-only mode.
+additional visual MCP tools are available. Use them conditionally —
+**always check if a tool is available before calling it**.
 
 ### MCP-Enhanced Flow
 
-When MCP tools **are** available, augment the reading flow:
+When visual MCP tools are available:
 
 1. **Open the file** in VS Code after displaying the briefing:
    - Call `open_file` with the file path and the first significant
-     line number (e.g., first export or function definition).
+     line number.
 
 2. **Highlight the current section** with importance-weighted visuals:
    - Call `highlight_range` with style `"focus"` on each function or
-     export body. Include the `importance` parameter (0.0-1.0) to
-     apply opacity-tiered visual weight.
-   - Compute default importance from `symbol_usage` in the reading
-     order entry: normalize caller counts to 0.0-1.0 (e.g.,
-     `min(callers / 8, 1.0)` — 8 callers saturates to full importance
-     since 8+ callers indicates a widely-used symbol in most codebases).
-     Dead code (callers=0) gets `importance: 0.0`.
-   - Override structural importance with semantic judgment: elevate
-     security-critical code even if callers are few, lower
-     boilerplate even if callers are many.
-   - Call `highlight_range` with style `"context"` on import blocks
-     or setup code the user has already read (no importance needed
-     for context highlights).
+     export body. Include the `importance` parameter (0.0-1.0).
+   - Call `highlight_range` with style `"context"` on import blocks.
 
-3. **Update decorations** when the user marks a file:
-   - On `confirmed` / `done` / `next`: call `mark_read` with the
-     file path, then call `clear_highlights` for that file.
-   - On `flag <reason>`: call `mark_flagged` with the file path and
-     reason, then call `clear_highlights` for that file.
-   - On `skim` / `skimmed`: call `clear_highlights` for that file.
-
-4. **Clear highlights** before moving to the next file:
-   - Call `clear_highlights` (no argument) to reset all visual state
-     before showing the next file briefing.
-
-### Fallback Without MCP
-
-When MCP tools are **not available** (extension not installed or not
-connected), the skill works identically to the base flow described
-above — text-only briefings, inline file reading, and progress
-tracking via `progress.json`. No MCP calls are made, and no errors
-are shown. The user experience is fully functional without the
-extension.
-
-### Setup
-
-To enable the VS Code extension integration:
-
-1. Build the extension: `cd packages/extension && npm run build`
-2. Install the extension in VS Code
-3. The MCP config in `.claude/mcp.json` tells Claude Code how to
-   connect to the extension's MCP server (stdio transport)
-4. Restart Claude Code to pick up the MCP configuration
+3. **Clear highlights** before moving to the next file:
+   - Call `clear_highlights` (no argument) to reset all visual state.
 
 ## Edge Cases
 

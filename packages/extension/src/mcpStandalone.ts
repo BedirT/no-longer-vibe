@@ -52,6 +52,7 @@ interface ProgressFile {
   status: string;
   read_at: string;
   note?: string;
+  summary?: string;
 }
 
 interface ProgressJson {
@@ -79,6 +80,10 @@ const TOOL_NAMES = [
   "clear_blast_radius",
   "update_progress_tree",
   "clear_all",
+  "get_next_briefing",
+  "get_read_status",
+  "get_flagged_files",
+  "complete_file",
 ] as const;
 
 /**
@@ -414,6 +419,197 @@ export function createStandaloneMcpServer(
     },
   );
 
+  // --- Reading session tools (context-efficient) ---
+
+  server.tool(
+    "get_next_briefing",
+    "Get the next unread file briefing with all context needed for a reading session. Returns the file path, layer, complexity, imports with their read statuses and summaries, exports, and progress stats. Use this instead of reading map.json/progress.json directly.",
+    {},
+    () => {
+      const map = readMapJson(root);
+      if (!map) {
+        return jsonResult({ status: "error", message: "map.json not found. Run /read-index first." });
+      }
+      const progress = readProgressJson(root);
+      if (!progress) {
+        return jsonResult({ status: "error", message: "progress.json not found. Run /read-index first." });
+      }
+
+      // Find next unread file
+      const nextEntry = map.reading_order.find((entry) => {
+        const fileProgress = progress.files[entry.path];
+        return !fileProgress || fileProgress.status === "unread";
+      });
+
+      if (!nextEntry) {
+        return jsonResult({ status: "all_read", progress: progress.stats });
+      }
+
+      // Build import details with statuses and summaries
+      const imports = nextEntry.imports.map((imp) => {
+        const impProgress = progress.files[imp];
+        return {
+          path: imp,
+          status: impProgress?.status ?? "unread",
+          summary: impProgress?.summary ?? null,
+        };
+      });
+
+      return jsonResult({
+        status: "ok",
+        path: nextEntry.path,
+        layer: nextEntry.layer,
+        line_count: nextEntry.line_count,
+        complexity: nextEntry.complexity,
+        reason: nextEntry.reason,
+        imports,
+        imported_by: nextEntry.imported_by,
+        exports: nextEntry.exports,
+        progress: progress.stats,
+      });
+    },
+  );
+
+  server.tool(
+    "get_read_status",
+    "Get current reading progress summary. Returns total, confirmed, flagged, skimmed, unread counts, current layer, next file, and session count.",
+    {},
+    () => {
+      const map = readMapJson(root);
+      const progress = readProgressJson(root);
+      if (!map || !progress) {
+        return jsonResult({ status: "error", message: "map.json or progress.json not found. Run /read-index first." });
+      }
+
+      // Find current layer (first layer with unread files)
+      const layers = map.reading_order.map((e) => e.layer);
+      let currentLayer: string | null = null;
+      let currentLayerTotal = 0;
+      let currentLayerRead = 0;
+      for (const entry of map.reading_order) {
+        const fileProgress = progress.files[entry.path];
+        if (!fileProgress || fileProgress.status === "unread") {
+          if (!currentLayer) currentLayer = entry.layer;
+        }
+      }
+      if (currentLayer) {
+        for (const entry of map.reading_order) {
+          if (entry.layer === currentLayer) {
+            currentLayerTotal++;
+            const fp = progress.files[entry.path];
+            if (fp && fp.status !== "unread") currentLayerRead++;
+          }
+        }
+      }
+
+      // Find next file
+      const nextEntry = map.reading_order.find((entry) => {
+        const fp = progress.files[entry.path];
+        return !fp || fp.status === "unread";
+      });
+
+      return jsonResult({
+        total: progress.stats.total,
+        confirmed: progress.stats.confirmed,
+        flagged: progress.stats.flagged,
+        skimmed: progress.stats.skimmed,
+        unread: progress.stats.unread,
+        current_layer: currentLayer,
+        current_layer_pct: currentLayerTotal > 0
+          ? Math.round((currentLayerRead / currentLayerTotal) * 100)
+          : 0,
+        next_file: nextEntry?.path ?? null,
+        flagged_count: progress.stats.flagged,
+        sessions: (progress as Record<string, unknown>).sessions ?? 0,
+      });
+    },
+  );
+
+  server.tool(
+    "get_flagged_files",
+    "Get all flagged files with their notes, summaries, and reading order context. Use this for the /read-flagged second pass.",
+    {},
+    () => {
+      const map = readMapJson(root);
+      const progress = readProgressJson(root);
+      if (!map || !progress) {
+        return jsonResult({ status: "error", message: "map.json or progress.json not found." });
+      }
+
+      const roLookup = new Map(map.reading_order.map((e) => [e.path, e]));
+      const flagged: Array<Record<string, unknown>> = [];
+
+      for (const [filePath, entry] of Object.entries(progress.files)) {
+        if (entry.status !== "flagged") continue;
+        const roEntry = roLookup.get(filePath);
+        flagged.push({
+          path: filePath,
+          note: entry.note ?? null,
+          summary: entry.summary ?? null,
+          layer: roEntry?.layer ?? "unknown",
+          line_count: roEntry?.line_count ?? 0,
+          reading_order_index: roEntry?.index ?? -1,
+          imports: roEntry?.imports ?? [],
+          imported_by: roEntry?.imported_by ?? [],
+          exports: roEntry?.exports ?? [],
+        });
+      }
+
+      // Sort by reading order index
+      flagged.sort((a, b) => (a.reading_order_index as number) - (b.reading_order_index as number));
+
+      if (flagged.length === 0) {
+        return jsonResult({ status: "none_flagged" });
+      }
+
+      return jsonResult({ status: "ok", flagged });
+    },
+  );
+
+  server.tool(
+    "complete_file",
+    "Mark a file as confirmed, flagged, or skimmed with an optional note and summary. Updates progress.json atomically.",
+    {
+      path: z.string().describe("Relative file path"),
+      status: z.enum(["confirmed", "flagged", "skimmed"]).describe("Completion status"),
+      note: z.string().optional().describe("Optional note (e.g., why flagged)"),
+      summary: z.string().optional().describe("One-line summary of the file"),
+    },
+    (args) => {
+      const progress = readProgressJson(root) ?? {
+        version: "1.0.0",
+        files: {},
+        stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
+      };
+
+      progress.files[args.path] = {
+        status: args.status,
+        read_at: new Date().toISOString(),
+        note: args.note,
+        summary: args.summary,
+      };
+
+      recomputeStats(progress);
+      writeProgressJson(root, progress);
+
+      // Forward to VS Code extension for visual update if connected
+      if (ipcClient?.isConnected()) {
+        const toolName = args.status === "flagged" ? "mark_flagged" : "mark_read";
+        const toolArgs = args.status === "flagged"
+          ? { path: args.path, reason: args.note ?? "" }
+          : { path: args.path };
+        void ipcClient.callTool(toolName, toolArgs);
+      }
+
+      return jsonResult({
+        status: "ok",
+        path: args.path,
+        marked_as: args.status,
+        progress: progress.stats,
+      });
+    },
+  );
+
   // --- Tools that forward to extension when IPC connected, else degrade ---
 
   server.tool(
@@ -572,7 +768,13 @@ export function createStandaloneMcpServer(
   return { server };
 }
 
-// --- Stats helper ---
+// --- Helpers ---
+
+function jsonResult(data: Record<string, unknown>) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  };
+}
 
 function recomputeStats(progress: ProgressJson): void {
   let confirmed = 0;
