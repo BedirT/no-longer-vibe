@@ -25,7 +25,10 @@ const STATUS_ICONS: Record<FileStatus | "current" | "unread", { id: string; colo
  * TreeDataProvider that displays reading progress as a sidebar tree.
  *
  * Hierarchy:
- *   Layer (foundation, core, ...) -> Files -> Exported symbols
+ *   Layer (foundation, core, ...)
+ *     -> Directory folders (collapsible, single-child chains collapsed)
+ *       -> Files
+ *         -> Exported symbols
  *
  * Each file shows a status icon (confirmed, flagged, current, unread).
  * Layer items show progress counts: "foundation (2/5 read)".
@@ -55,7 +58,8 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   /**
    * Returns child elements for the given tree item.
    * - No parent: returns layer items (root level)
-   * - Layer item: returns file items
+   * - Layer item: returns directory/file items at the layer root
+   * - Dir item: returns subdirectory/file items within that directory
    * - File item: returns export/symbol items
    */
   getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
@@ -71,7 +75,16 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
     if (ctx.startsWith("layer:")) {
       const layerName = ctx.slice("layer:".length) as LayerName;
-      return this.buildFileItems(layerName);
+      return this.buildDirChildren(layerName, "");
+    }
+
+    if (ctx.startsWith("dir:")) {
+      // Format: "dir:<layer>:<dirPath>"
+      const rest = ctx.slice("dir:".length);
+      const sepIdx = rest.indexOf(":");
+      const layerName = rest.slice(0, sepIdx) as LayerName;
+      const dirPath = rest.slice(sepIdx + 1);
+      return this.buildDirChildren(layerName, dirPath);
     }
 
     if (ctx.startsWith("file:")) {
@@ -205,6 +218,7 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
       const label = `${layerName} (${String(readCount)}/${String(total)} read)`;
 
       const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
+      item.id = `layer:${layerName}`;
       item.contextValue = `layer:${layerName}`;
       item.tooltip = layer.description;
 
@@ -215,18 +229,81 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   }
 
   /**
-   * Builds file-level tree items for a given layer.
+   * Builds directory and file tree items for a given layer at a given
+   * directory prefix. Returns subdirectory nodes and file nodes that
+   * are direct children of the prefix.
+   *
+   * Single-child directory chains are collapsed: if a directory only
+   * contains one subdirectory (and no files), they merge into a single
+   * node label like "agents/gap_finder".
    */
-  private buildFileItems(layerName: LayerName): vscode.TreeItem[] {
+  private buildDirChildren(
+    layerName: LayerName,
+    dirPrefix: string,
+  ): vscode.TreeItem[] {
     const layer = this.mapData?.layers[layerName];
     if (!layer) {
       return [];
     }
 
-    return layer.files.map((filePath) => {
+    // Collect files that live under this dirPrefix
+    const filesUnder = dirPrefix
+      ? layer.files.filter((f) => f.startsWith(dirPrefix + "/"))
+      : layer.files;
+
+    // Build a single-level grouping: immediate subdirs and direct files
+    const subdirs = new Map<string, string[]>();
+    const directFiles: string[] = [];
+
+    for (const filePath of filesUnder) {
+      const remainder = dirPrefix ? filePath.slice(dirPrefix.length + 1) : filePath;
+      const slashIdx = remainder.indexOf("/");
+
+      if (slashIdx === -1) {
+        // Direct file at this level
+        directFiles.push(filePath);
+      } else {
+        // File is in a subdirectory
+        const subdir = remainder.slice(0, slashIdx);
+        const fullSubdir = dirPrefix ? `${dirPrefix}/${subdir}` : subdir;
+        if (!subdirs.has(fullSubdir)) {
+          subdirs.set(fullSubdir, []);
+        }
+        subdirs.get(fullSubdir)!.push(filePath);
+      }
+    }
+
+    const items: vscode.TreeItem[] = [];
+
+    // Build subdirectory items (sorted)
+    const sortedSubdirs = [...subdirs.entries()].sort(([a], [b]) => a.localeCompare(b));
+    for (const [subdirPath, subdirFiles] of sortedSubdirs) {
+      // Collapse single-child directory chains
+      const { label, resolvedPath } = this.collapseDirChain(
+        layerName,
+        subdirPath,
+        subdirFiles,
+      );
+
+      const item = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.Collapsed);
+      item.id = `dir:${layerName}:${resolvedPath}`;
+      item.contextValue = `dir:${layerName}:${resolvedPath}`;
+      item.iconPath = new vscode.ThemeIcon("folder");
+      item.tooltip = resolvedPath;
+
+      items.push(item);
+    }
+
+    // Build file items (sorted by basename)
+    const sortedFiles = [...directFiles].sort((a, b) => {
+      const aName = a.split("/").pop() ?? a;
+      const bName = b.split("/").pop() ?? b;
+      return aName.localeCompare(bName);
+    });
+
+    for (const filePath of sortedFiles) {
       const entry = this.findReadingOrderEntry(filePath);
       const basename = filePath.split("/").pop() ?? filePath;
-      const dirPath = filePath.split("/").slice(0, -1).join("/");
 
       const hasExports = entry !== undefined && entry.exports.length > 0;
       const collapsibleState = hasExports
@@ -234,8 +311,8 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
         : vscode.TreeItemCollapsibleState.None;
 
       const item = new vscode.TreeItem(basename, collapsibleState);
+      item.id = `file:${filePath}`;
       item.contextValue = `file:${filePath}`;
-      item.description = dirPath || undefined;
       item.iconPath = this.getFileIcon(filePath);
       item.command = {
         command: "vscode.open",
@@ -243,8 +320,56 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
         arguments: [vscode.Uri.file(`${this.workspaceRoot}/${filePath}`)],
       };
 
-      return item;
-    });
+      items.push(item);
+    }
+
+    return items;
+  }
+
+  /**
+   * Collapse single-child directory chains. If a directory has only
+   * subdirectories (no direct files) and exactly one subdirectory,
+   * merge them into a combined label: "agents/gap_finder".
+   *
+   * Returns the display label and the resolved full path.
+   */
+  private collapseDirChain(
+    layerName: LayerName,
+    dirPath: string,
+    filesInDir: string[],
+  ): { label: string; resolvedPath: string } {
+    let currentPath = dirPath;
+    let displayLabel = dirPath.split("/").pop() ?? dirPath;
+
+    // Keep collapsing while the directory has only subdirs (no direct files)
+    // and exactly one subdirectory
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const directFiles: string[] = [];
+      const childDirs = new Set<string>();
+
+      for (const f of filesInDir) {
+        const remainder = f.slice(currentPath.length + 1);
+        const slashIdx = remainder.indexOf("/");
+        if (slashIdx === -1) {
+          directFiles.push(f);
+        } else {
+          const subdir = remainder.slice(0, slashIdx);
+          childDirs.add(subdir);
+        }
+      }
+
+      // Can only collapse if: no direct files AND exactly one child dir
+      if (directFiles.length > 0 || childDirs.size !== 1) {
+        break;
+      }
+
+      const onlyChild = [...childDirs][0];
+      currentPath = `${currentPath}/${onlyChild}`;
+      displayLabel = `${displayLabel}/${onlyChild}`;
+    }
+
+    return { label: displayLabel, resolvedPath: currentPath };
   }
 
   /**
@@ -258,6 +383,7 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
     return entry.exports.map((exportName) => {
       const item = new vscode.TreeItem(exportName, vscode.TreeItemCollapsibleState.None);
+      item.id = `export:${filePath}:${exportName}`;
       item.contextValue = `export:${exportName}`;
       item.iconPath = new vscode.ThemeIcon("symbol-function");
       return item;
