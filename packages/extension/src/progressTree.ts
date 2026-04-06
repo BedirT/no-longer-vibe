@@ -449,7 +449,7 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     return entry.exports.map((exportName) => {
       const item = new vscode.TreeItem(exportName, vscode.TreeItemCollapsibleState.None);
       item.id = `export:${filePath}:${exportName}`;
-      item.contextValue = `export:${exportName}`;
+      item.contextValue = `export:${filePath}:${exportName}`;
 
       if (readExports?.has(exportName)) {
         const config = STATUS_ICONS.confirmed;

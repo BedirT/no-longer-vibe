@@ -539,8 +539,8 @@ describe("ProgressTreeProvider", () => {
       const files = getFilesFromLayer(provider, foundationLayer);
       const exports = provider.getChildren(files[0]);
 
-      expect(exports[0].contextValue).toBe("export:AppConfig");
-      expect(exports[1].contextValue).toBe("export:getConfig");
+      expect(exports[0].contextValue).toBe("export:src/config.ts:AppConfig");
+      expect(exports[1].contextValue).toBe("export:src/config.ts:getConfig");
     });
 
     it("returns empty array for files with no exports", () => {

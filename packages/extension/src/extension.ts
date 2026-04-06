@@ -7,6 +7,7 @@ import {
   dispose as disposeProgress,
   loadProgressData,
   onProgressDataChanged,
+  updateExportStatus,
   updateFileStatus,
   watchProgressJson,
 } from "./progressData";
@@ -227,6 +228,25 @@ export async function activate(
       );
       context.subscriptions.push(disposable);
     }
+
+    // Register export marking command (right-click on export node)
+    const markExportCmd = vscode.commands.registerCommand(
+      "nlv.markExportRead",
+      async (item?: vscode.TreeItem) => {
+        const ctx = item?.contextValue ?? "";
+        if (!ctx.startsWith("export:")) return;
+        // contextValue format: "export:<filePath>:<exportName>"
+        const rest = ctx.slice("export:".length);
+        const lastColon = rest.lastIndexOf(":");
+        if (lastColon === -1) return;
+        const filePath = rest.slice(0, lastColon);
+        const exportName = rest.slice(lastColon + 1);
+        await updateExportStatus(filePath, exportName);
+        // Clear any agent highlights on this file
+        highlightManager.clearHighlightsForFile(filePath);
+      },
+    );
+    context.subscriptions.push(markExportCmd);
 
     // Populate initial progress state from progress.json
     if (progressData) {

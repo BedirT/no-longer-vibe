@@ -205,6 +205,12 @@ export class HighlightManager {
     this.applyDecorationsForFile(file);
   }
 
+  /** Clears highlights for a specific file. Public API for use by commands. */
+  clearHighlightsForFile(filePath: string): void {
+    this.activeHighlights.delete(filePath);
+    this.clearDecorationsForFile(filePath);
+  }
+
   /** Handles the clear_highlights tool event. */
   private handleClearHighlights(params: Record<string, unknown>): void {
     const file = params.file as string | undefined;
