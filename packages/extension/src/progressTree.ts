@@ -116,6 +116,23 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   }
 
   /**
+   * Bulk-syncs file statuses from progress.json data.
+   * Replaces all existing statuses with the ones from progress data,
+   * preserving the currentFile. Fires a single tree refresh.
+   */
+  syncFromProgress(
+    files: Record<string, { status: string; read_at: string }>,
+  ): void {
+    this.fileStatuses.clear();
+    for (const [path, entry] of Object.entries(files)) {
+      if (this.isValidStatus(entry.status)) {
+        this.fileStatuses.set(path, entry.status as FileStatus);
+      }
+    }
+    this._onDidChangeTreeData.fire();
+  }
+
+  /**
    * Forces a refresh of the tree view.
    */
   refresh(): void {
@@ -294,5 +311,9 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
     return this.mapData?.reading_order.find(
       (entry) => entry.path === relativePath,
     );
+  }
+
+  private isValidStatus(status: string): boolean {
+    return status === "confirmed" || status === "flagged" || status === "skimmed";
   }
 }

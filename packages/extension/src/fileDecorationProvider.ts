@@ -140,6 +140,23 @@ export class FileStatusDecorationProvider
   }
 
   /**
+   * Bulk-syncs file statuses from progress.json data.
+   * Replaces all existing statuses with the ones from progress data,
+   * preserving the currentFile. Fires a single global change event.
+   */
+  syncFromProgress(
+    files: Record<string, { status: string; read_at: string }>,
+  ): void {
+    this.statuses.clear();
+    for (const [path, entry] of Object.entries(files)) {
+      if (this.isValidStatus(entry.status)) {
+        this.statuses.set(path, entry.status as FileStatus);
+      }
+    }
+    this._onDidChangeFileDecorations.fire(undefined);
+  }
+
+  /**
    * Subscribes to MCP tool events that affect file decorations.
    * Returns an array of Disposables for cleanup.
    */
@@ -217,5 +234,9 @@ export class FileStatusDecorationProvider
   private toUri(relativePath: string): vscode.Uri {
     const fullPath = `${this.workspaceRoot}/${relativePath}`;
     return vscode.Uri.file(fullPath);
+  }
+
+  private isValidStatus(status: string): boolean {
+    return status === "confirmed" || status === "flagged" || status === "skimmed";
   }
 }

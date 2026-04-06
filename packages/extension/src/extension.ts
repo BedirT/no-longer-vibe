@@ -3,6 +3,12 @@ import { BlastRadiusProvider } from "./blastRadius";
 import { CallerCountProvider } from "./callerCount";
 import { CodeLensProvider } from "./codeLensProvider";
 import { dispose, loadMapData, onMapDataChanged, watchMapJson } from "./mapData";
+import {
+  dispose as disposeProgress,
+  loadProgressData,
+  onProgressDataChanged,
+  watchProgressJson,
+} from "./progressData";
 import { FileStatusDecorationProvider } from "./fileDecorationProvider";
 import { openFile } from "./fileOpener";
 import { HighlightManager } from "./highlightManager";
@@ -37,6 +43,18 @@ export async function activate(
   // Watch for map.json changes
   const watcherDisposable = watchMapJson();
   context.subscriptions.push(watcherDisposable);
+
+  // Load progress.json on activation
+  const progressData = await loadProgressData();
+  if (progressData) {
+    outputChannel.appendLine(
+      `Loaded progress: ${String(progressData.stats.confirmed)} confirmed, ${String(progressData.stats.flagged)} flagged, ${String(progressData.stats.unread)} unread`,
+    );
+  }
+
+  // Watch for progress.json changes
+  const progressWatcherDisposable = watchProgressJson();
+  context.subscriptions.push(progressWatcherDisposable);
 
   // Set up caller count gutter decorations
   const callerCountProvider = new CallerCountProvider();
@@ -174,6 +192,24 @@ export async function activate(
       context.subscriptions.push(d);
     }
 
+    // Populate initial progress state from progress.json
+    if (progressData) {
+      decorationProvider.syncFromProgress(progressData.files);
+      progressTree.syncFromProgress(progressData.files);
+    }
+
+    // Subscribe to progress.json filesystem changes
+    const progressDataSub = onProgressDataChanged((data) => {
+      if (data) {
+        decorationProvider.syncFromProgress(data.files);
+        progressTree.syncFromProgress(data.files);
+      } else {
+        decorationProvider.clearAll();
+        progressTree.clearAll();
+      }
+    });
+    context.subscriptions.push(progressDataSub);
+
     // Refresh progress tree and blast radius when map data changes
     const progressTreeMapSub = onMapDataChanged((data) => {
       progressTree.updateMapData(data);
@@ -230,4 +266,5 @@ export async function activate(
  */
 export function deactivate(): void {
   dispose();
+  disposeProgress();
 }
