@@ -42,6 +42,7 @@ from nlv.reading_order import (
     ReadingOrderEntry,
     compute_reading_order,
 )
+from nlv.refresh import refresh_progress
 from nlv.walker import SourceFile, walk_tree
 
 logger = logging.getLogger(__name__)
@@ -127,8 +128,10 @@ def run_index(root: Path) -> IndexResult:
     file_paths = [root / sf.path for sf in source_files]
     content_hashes = compute_content_hashes(file_paths, root=root)
 
+    # Capture old content hashes before overwriting map.json
+    old_content_hashes = _read_old_content_hashes(guide_dir)
+
     # Write map.json
-    guide_dir = root / _GUIDE_DIR_NAME
     map_path = write_map_json(
         output_dir=guide_dir,
         repo_root=str(root),
@@ -138,8 +141,8 @@ def run_index(root: Path) -> IndexResult:
         content_hashes=content_hashes,
     )
 
-    # Initialize progress.json
-    _init_progress(guide_dir, map_path)
+    # Initialize or refresh progress.json
+    _init_progress(guide_dir, map_path, old_content_hashes)
 
     # Build result
     layer_counts = _count_layers(classification)
@@ -274,17 +277,53 @@ def _compute_order_with_complexity(
     return tuple(enriched)
 
 
+def _read_old_content_hashes(guide_dir: Path) -> dict[str, str]:
+    """Read content hashes from the existing map.json before it's overwritten.
+
+    Args:
+        guide_dir: Path to the .codebase-guide directory.
+
+    Returns:
+        Content hashes dict, or empty dict if no map.json exists.
+    """
+    map_path = guide_dir / "map.json"
+    if not map_path.exists():
+        return {}
+    try:
+        data = json.loads(map_path.read_text())
+        result: dict[str, str] = data.get("content_hashes", {})
+        return result
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Failed to read old map.json for hash comparison")
+        return {}
+
+
 def _init_progress(
     guide_dir: Path,
     map_path: Path,
+    old_content_hashes: dict[str, str],
 ) -> None:
-    """Initialize progress.json from the generated map.json."""
+    """Initialize or refresh progress.json from the generated map.json.
+
+    If progress.json does not exist, creates a fresh one. If it does
+    exist, runs the refresh logic to preserve reading progress on
+    unchanged files (BED-102).
+    """
     map_content = map_path.read_text()
     map_data = json.loads(map_content)
     map_hash = hashlib.sha256(map_content.encode()).hexdigest()
 
-    mgr = ProgressManager(guide_dir)
-    mgr.create(map_data, map_hash, force=True)
+    progress_path = guide_dir / "progress.json"
+    if progress_path.exists():
+        refresh_progress(
+            guide_dir,
+            map_data,
+            map_hash,
+            old_content_hashes=old_content_hashes,
+        )
+    else:
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
 
 
 def _count_layers(
