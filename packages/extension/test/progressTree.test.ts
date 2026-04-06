@@ -706,6 +706,82 @@ describe("ProgressTreeProvider", () => {
     });
   });
 
+  describe("syncFromProgress", () => {
+    it("populates file statuses from progress data", () => {
+      provider.updateMapData(makeMap());
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+        "src/models/user.ts": { status: "flagged", read_at: "2026-04-05T11:00:00Z" },
+      });
+
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      expect(foundationLayer.label).toBe("foundation (1/1 read)");
+
+      const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
+      expect(coreLayer.label).toBe("core (1/1 read)");
+    });
+
+    it("removes statuses for files no longer in progress data", () => {
+      provider.updateMapData(makeMap());
+      provider.setFileStatus("src/config.ts", "confirmed");
+      provider.setFileStatus("src/models/user.ts", "flagged");
+
+      // Sync with only config — user.ts should become unread
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      const layers = provider.getChildren();
+      const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
+      expect(coreLayer.label).toBe("core (0/1 read)");
+    });
+
+    it("preserves currentFile across sync", () => {
+      provider.updateMapData(makeMap());
+      provider.setCurrentFile("src/config.ts");
+
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const files = provider.getChildren(foundationLayer);
+      const icon = files[0].iconPath as { id: string };
+      // Current takes priority
+      expect(icon.id).toBe("eye");
+    });
+
+    it("fires onDidChangeTreeData event", () => {
+      provider.updateMapData(makeMap());
+      const listener = vi.fn();
+      provider.onDidChangeTreeData(listener);
+
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      expect(listener).toHaveBeenCalled();
+    });
+
+    it("ignores entries with unrecognized status", () => {
+      provider.updateMapData(makeMap());
+      provider.syncFromProgress({
+        "src/config.ts": { status: "confirmed", read_at: "2026-04-04T10:00:00Z" },
+        "src/models/user.ts": { status: "unknown_status", read_at: "2026-04-04T10:00:00Z" },
+      });
+
+      const layers = provider.getChildren();
+      const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
+      expect(coreLayer.label).toBe("core (0/1 read)");
+    });
+  });
+
   describe("dispose", () => {
     it("can be called without error", () => {
       provider.updateMapData(makeMap());
