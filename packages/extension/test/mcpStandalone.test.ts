@@ -28,11 +28,11 @@ describe("mcpStandalone", () => {
       expect(server).toBeDefined();
     });
 
-    it("registers all 14 tools", async () => {
+    it("registers all 15 tools", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const names = mod.getStandaloneToolNames();
-      expect(names).toHaveLength(14);
+      expect(names).toHaveLength(15);
       expect(names).toContain("highlight_range");
       expect(names).toContain("clear_highlights");
       expect(names).toContain("open_file");
@@ -47,6 +47,7 @@ describe("mcpStandalone", () => {
       expect(names).toContain("get_read_status");
       expect(names).toContain("get_flagged_files");
       expect(names).toContain("complete_file");
+      expect(names).toContain("mark_export_read");
       // Ensure server was created (suppress unused-variable lint)
       expect(server).toBeDefined();
     });

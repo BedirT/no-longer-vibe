@@ -176,10 +176,27 @@ export async function activate(
 
     // Register progress tree sidebar view
     const progressTree = new ProgressTreeProvider(workspaceRoot);
-    context.subscriptions.push(
-      vscode.window.registerTreeDataProvider("nlv.progressTree", progressTree),
-    );
+    const progressTreeView = vscode.window.createTreeView("nlv.progressTree", {
+      treeDataProvider: progressTree,
+    });
+    context.subscriptions.push(progressTreeView);
     context.subscriptions.push({ dispose: () => progressTree.dispose() });
+
+    // Auto-reveal opened files in the progress tree
+    const revealSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (!editor) return;
+      const filePath = editor.document.uri.fsPath;
+      if (!filePath.startsWith(workspaceRoot)) return;
+      const relativePath = filePath.slice(workspaceRoot.length + 1);
+      const item = progressTree.getItemById(`file:${relativePath}`);
+      if (item) {
+        progressTreeView.reveal(item, { select: true, focus: false, expand: true }).then(
+          undefined,
+          () => { /* ignore reveal errors (e.g. tree not visible) */ },
+        );
+      }
+    });
+    context.subscriptions.push(revealSub);
 
     if (mapData) {
       progressTree.updateMapData(mapData);

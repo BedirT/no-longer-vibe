@@ -53,6 +53,7 @@ interface ProgressFile {
   read_at: string;
   note?: string;
   summary?: string;
+  exports_read?: Record<string, { read_at: string; summary?: string | null }>;
 }
 
 interface ProgressJson {
@@ -84,6 +85,7 @@ const TOOL_NAMES = [
   "get_read_status",
   "get_flagged_files",
   "complete_file",
+  "mark_export_read",
 ] as const;
 
 /**
@@ -605,6 +607,51 @@ export function createStandaloneMcpServer(
         status: "ok",
         path: args.path,
         marked_as: args.status,
+        progress: progress.stats,
+      });
+    },
+  );
+
+  server.tool(
+    "mark_export_read",
+    "Mark a single export/symbol within a file as read, enabling partial file progress tracking. Updates exports_read in progress.json.",
+    {
+      path: z.string().describe("Relative file path"),
+      export_name: z.string().describe("Name of the export/symbol to mark as read"),
+      summary: z.string().optional().describe("Optional one-line summary of the export"),
+    },
+    (args) => {
+      const progress = readProgressJson(root) ?? {
+        version: "1.0.0",
+        files: {},
+        stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
+      };
+
+      // Ensure the file entry exists
+      if (!progress.files[args.path]) {
+        progress.files[args.path] = {
+          status: "unread",
+          read_at: new Date().toISOString(),
+        };
+      }
+
+      const fileEntry = progress.files[args.path];
+      if (!fileEntry.exports_read) {
+        fileEntry.exports_read = {};
+      }
+
+      fileEntry.exports_read[args.export_name] = {
+        read_at: new Date().toISOString(),
+        summary: args.summary,
+      };
+
+      writeProgressJson(root, progress);
+
+      return jsonResult({
+        status: "ok",
+        path: args.path,
+        export_name: args.export_name,
+        exports_read: fileEntry.exports_read,
         progress: progress.stats,
       });
     },

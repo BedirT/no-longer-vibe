@@ -86,6 +86,20 @@ When visual MCP tools are available:
 3. **Clear highlights** before moving to the next file:
    - Call `clear_highlights` (no argument) to reset all visual state.
 
+## Partial File Reading (Export-Level Progress)
+
+For large files with many exports, users can mark individual exports
+as read before completing the entire file:
+
+- When user says "done with <export_name>" or "mark <export_name>",
+  call the `mark_export_read` MCP tool with `path` (current file) and
+  `export_name`. Optionally include a `summary`.
+- When user says "done" / "confirmed" / "next", call `complete_file`
+  as usual to mark the whole file done.
+- The VS Code extension sidebar will show per-export read status
+  (check icon for read, circle for unread) and partial progress counts
+  on file items (e.g., "3/8").
+
 ## Edge Cases
 
 - If all files are read, congratulate the user and show final stats.

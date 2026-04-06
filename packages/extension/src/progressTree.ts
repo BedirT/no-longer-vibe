@@ -43,6 +43,13 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   private currentFile: string | undefined;
   private readonly workspaceRoot: string;
 
+  /** Cache of all tree items by id for getParent/getItemById lookups. */
+  private readonly itemsById = new Map<string, vscode.TreeItem>();
+  /** Maps child id -> parent id for getParent lookups. */
+  private readonly parentIdMap = new Map<string, string>();
+  /** Tracks which exports have been read per file (filePath -> set of export names). */
+  private readonly exportsRead = new Map<string, Set<string>>();
+
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
   }
@@ -53,6 +60,24 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
    */
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
     return element;
+  }
+
+  /**
+   * Returns the parent of a tree item, enabling reveal() support.
+   */
+  getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
+    const id = element.id ?? element.contextValue;
+    if (!id) return undefined;
+    const parentId = this.parentIdMap.get(id);
+    if (!parentId) return undefined;
+    return this.itemsById.get(parentId);
+  }
+
+  /**
+   * Returns a cached tree item by its id string.
+   */
+  getItemById(id: string): vscode.TreeItem | undefined {
+    return this.itemsById.get(id);
   }
 
   /**
@@ -131,15 +156,20 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   /**
    * Bulk-syncs file statuses from progress.json data.
    * Replaces all existing statuses with the ones from progress data,
-   * preserving the currentFile. Fires a single tree refresh.
+   * preserving the currentFile. Also syncs exports_read data.
+   * Fires a single tree refresh.
    */
   syncFromProgress(
-    files: Record<string, { status: string; read_at: string }>,
+    files: Record<string, { status: string; read_at: string; exports_read?: Record<string, { read_at: string; summary?: string | null }> }>,
   ): void {
     this.fileStatuses.clear();
+    this.exportsRead.clear();
     for (const [path, entry] of Object.entries(files)) {
       if (isFileStatus(entry.status)) {
         this.fileStatuses.set(path, entry.status);
+      }
+      if (entry.exports_read) {
+        this.exportsRead.set(path, new Set(Object.keys(entry.exports_read)));
       }
     }
     this._onDidChangeTreeData.fire();
@@ -205,6 +235,10 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
    * Builds root-level tree items for each non-empty layer.
    */
   private buildLayerItems(): vscode.TreeItem[] {
+    // Clear parent tracking caches — buildLayerItems is the root call
+    this.itemsById.clear();
+    this.parentIdMap.clear();
+
     const items: vscode.TreeItem[] = [];
 
     for (const layerName of LAYER_ORDER) {
@@ -222,6 +256,7 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
       item.contextValue = `layer:${layerName}`;
       item.tooltip = layer.description;
 
+      this.itemsById.set(item.id, item);
       items.push(item);
     }
 
@@ -291,6 +326,13 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
       item.iconPath = new vscode.ThemeIcon("folder");
       item.tooltip = resolvedPath;
 
+      // Determine parent id for this directory item
+      const parentId = dirPrefix
+        ? `dir:${layerName}:${dirPrefix}`
+        : `layer:${layerName}`;
+      this.itemsById.set(item.id!, item);
+      this.parentIdMap.set(item.id!, parentId);
+
       items.push(item);
     }
 
@@ -319,6 +361,27 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
         title: "Open File",
         arguments: [vscode.Uri.file(`${this.workspaceRoot}/${filePath}`)],
       };
+
+      // Add partial export progress description
+      if (hasExports && entry) {
+        const readExports = this.exportsRead.get(filePath);
+        if (readExports && readExports.size > 0) {
+          const readCount = readExports.size;
+          const totalExports = entry.exports.length;
+          item.description = `(${String(readCount)}/${String(totalExports)})`;
+          // If some exports read but file not fully marked, show partial icon
+          if (!this.fileStatuses.has(filePath) && readCount < totalExports) {
+            item.iconPath = new vscode.ThemeIcon("circle-slash");
+          }
+        }
+      }
+
+      // Determine parent id for this file item
+      const parentId = dirPrefix
+        ? `dir:${layerName}:${dirPrefix}`
+        : `layer:${layerName}`;
+      this.itemsById.set(item.id!, item);
+      this.parentIdMap.set(item.id!, parentId);
 
       items.push(item);
     }
@@ -381,11 +444,28 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
       return [];
     }
 
+    const readExports = this.exportsRead.get(filePath);
+
     return entry.exports.map((exportName) => {
       const item = new vscode.TreeItem(exportName, vscode.TreeItemCollapsibleState.None);
       item.id = `export:${filePath}:${exportName}`;
       item.contextValue = `export:${exportName}`;
-      item.iconPath = new vscode.ThemeIcon("symbol-function");
+
+      if (readExports?.has(exportName)) {
+        const config = STATUS_ICONS.confirmed;
+        item.iconPath = new vscode.ThemeIcon(
+          config.id,
+          config.colorId ? new vscode.ThemeColor(config.colorId) : undefined,
+        );
+      } else {
+        item.iconPath = new vscode.ThemeIcon("circle-outline");
+      }
+
+      // Register in parent tracking
+      const parentId = `file:${filePath}`;
+      this.itemsById.set(item.id!, item);
+      this.parentIdMap.set(item.id!, parentId);
+
       return item;
     });
   }
