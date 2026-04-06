@@ -53,6 +53,8 @@ class RefreshResult:
         removed: Count of removed files deleted from progress.
         unchanged: Count of unchanged files with preserved progress.
         transitively_invalidated: Count of downstream files marked stale.
+        pruned: Count of progress entries removed for files not in
+            reading_order (e.g. trivial __init__.py, config-excluded).
     """
 
     new: int
@@ -60,6 +62,7 @@ class RefreshResult:
     removed: int
     unchanged: int
     transitively_invalidated: int
+    pruned: int
 
 
 # ---------------------------------------------------------------------------
@@ -254,11 +257,24 @@ def refresh_progress(
             files[path]["note"] = note
             invalidated_count += 1
 
-    # 5. Update map_hash and recompute stats
+    # 5. Prune files not in reading_order (excluded by trivial init
+    #    filter, config exclude_from_reading patterns, etc.)
+    reading_order_paths = {
+        e["path"] for e in new_map.get("reading_order", [])
+    }
+    pruned_paths = [p for p in list(files) if p not in reading_order_paths]
+    for p in pruned_paths:
+        del files[p]
+    if pruned_paths:
+        logger.debug(
+            "Pruned %d file(s) not in reading_order", len(pruned_paths),
+        )
+
+    # 6. Update map_hash and recompute stats
     old_data["map_hash"] = new_map_hash
     old_data["stats"] = mgr.compute_stats()
 
-    # 6. Save atomically
+    # 7. Save atomically
     mgr.save()
 
     return RefreshResult(
@@ -267,6 +283,7 @@ def refresh_progress(
         removed=len(diff.removed_files),
         unchanged=len(diff.unchanged_files),
         transitively_invalidated=invalidated_count,
+        pruned=len(pruned_paths),
     )
 
 
