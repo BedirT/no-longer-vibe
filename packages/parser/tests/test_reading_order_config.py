@@ -529,3 +529,105 @@ class TestEnhancedContractHeuristics:
 
         entry = next(e for e in order if e.path == "models.py")
         assert entry.reading_pass == ReadingPass.CONTRACTS
+
+
+# ---------------------------------------------------------------------------
+# exclude_from_reading integration
+# ---------------------------------------------------------------------------
+
+
+class TestExcludeFromReadingOrder:
+    """Tests that exclude_from_reading filters files from reading order."""
+
+    def test_exclude_init_files(self) -> None:
+        """__init__.py files matching the exclude pattern are removed."""
+        results = {
+            "pkg/__init__.py": _empty_result(),
+            "pkg/core.py": _empty_result(),
+            "pkg/utils.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        cfg = ReadingConfig(exclude_from_reading=("**/__init__.py",))
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+            config=cfg,
+        )
+
+        paths = [e.path for e in order]
+        assert "pkg/__init__.py" not in paths
+        assert "pkg/core.py" in paths
+        assert "pkg/utils.py" in paths
+
+    def test_exclude_multiple_patterns(self) -> None:
+        """Multiple exclude patterns are all applied."""
+        results = {
+            "pkg/__init__.py": _empty_result(),
+            "conftest.py": _empty_result(),
+            "src/app.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        cfg = ReadingConfig(
+            exclude_from_reading=("**/__init__.py", "conftest.py"),
+        )
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+            config=cfg,
+        )
+
+        paths = [e.path for e in order]
+        assert "pkg/__init__.py" not in paths
+        assert "conftest.py" not in paths
+        assert "src/app.py" in paths
+
+    def test_empty_exclude_keeps_all_files(self) -> None:
+        """Empty exclude_from_reading preserves all files."""
+        results = {
+            "pkg/__init__.py": _empty_result(),
+            "pkg/core.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        cfg = ReadingConfig(exclude_from_reading=())
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+            config=cfg,
+        )
+
+        paths = [e.path for e in order]
+        assert len(paths) == 2
+
+    def test_exclude_updates_indices(self) -> None:
+        """Indices are sequential after exclusion (no gaps)."""
+        results = {
+            "a/__init__.py": _empty_result(),
+            "a/first.py": _empty_result(),
+            "a/second.py": _empty_result(),
+        }
+        graph, classification = _build_graph_and_classification(
+            results, resolved={},
+        )
+
+        cfg = ReadingConfig(exclude_from_reading=("**/__init__.py",))
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+            config=cfg,
+        )
+
+        indices = [e.index for e in order]
+        assert indices == list(range(len(order)))

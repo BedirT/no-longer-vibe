@@ -38,18 +38,19 @@ type ImportanceTier = "critical" | "important" | "standard" | "low";
  */
 const IMPORTANCE_TIER_CONFIGS: Record<ImportanceTier, DecorationStyleConfig> = {
   critical: {
-    backgroundColor: "rgba(59, 130, 246, 0.12)",
-    borderLeft: "4px solid rgba(59, 130, 246, 0.6)",
+    backgroundColor: "rgba(59, 130, 246, 0.14)",
+    borderLeft: "4px solid rgba(59, 130, 246, 0.7)",
   },
   important: {
-    backgroundColor: "rgba(59, 130, 246, 0.07)",
-    borderLeft: "2px solid rgba(59, 130, 246, 0.4)",
+    backgroundColor: "rgba(34, 197, 94, 0.10)",
+    borderLeft: "3px solid rgba(34, 197, 94, 0.5)",
   },
   standard: {
-    backgroundColor: "rgba(59, 130, 246, 0.04)",
+    backgroundColor: "rgba(148, 163, 184, 0.08)",
+    borderLeft: "2px solid rgba(148, 163, 184, 0.3)",
   },
   low: {
-    backgroundColor: "rgba(239, 68, 68, 0.03)",
+    backgroundColor: "rgba(148, 163, 184, 0.04)",
   },
 };
 

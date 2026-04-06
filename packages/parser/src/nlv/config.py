@@ -91,6 +91,8 @@ class ReadingConfig:
             (e.g., ``{"src/types/**": "contracts"}``).
         integration_fan_in_threshold: Minimum fan_in for a file at depth 3+
             to qualify as integration layer.
+        exclude_from_reading: Glob patterns for files to exclude from
+            the reading order (e.g., ``("**/__init__.py",)``).
     """
 
     skip_tests: bool = False
@@ -103,6 +105,7 @@ class ReadingConfig:
         default_factory=lambda: dict[str, str](),
     )
     integration_fan_in_threshold: int = 3
+    exclude_from_reading: tuple[str, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -257,6 +260,10 @@ def _build_config_from_raw(raw: dict[str, object]) -> ReadingConfig:
     else:
         integration_fan_in_threshold = defaults.integration_fan_in_threshold
 
+    exclude_from_reading = _parse_exclude_from_reading(
+        raw.get("exclude_from_reading"),
+    )
+
     return ReadingConfig(
         skip_tests=skip_tests,
         test_pass=test_pass,
@@ -264,6 +271,7 @@ def _build_config_from_raw(raw: dict[str, object]) -> ReadingConfig:
         tie_breaking=tie_breaking,
         custom_pass_overrides=custom_pass_overrides,
         integration_fan_in_threshold=integration_fan_in_threshold,
+        exclude_from_reading=exclude_from_reading,
     )
 
 
@@ -323,3 +331,37 @@ def _parse_custom_pass_overrides(
         raise ValueError(msg)
     typed = cast(dict[str, object], value)
     return {str(k): str(v) for k, v in typed.items()}
+
+
+def _parse_exclude_from_reading(value: object) -> tuple[str, ...]:
+    """Parse exclude_from_reading from raw config value."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        msg = "exclude_from_reading must be a list of strings"
+        raise ValueError(msg)
+    typed = cast(list[object], value)
+    for item in typed:
+        if not isinstance(item, str):
+            msg = (
+                f"exclude_from_reading items must be strings, "
+                f"got {type(item).__name__}"
+            )
+            raise ValueError(msg)
+    return tuple(cast(list[str], typed))
+
+
+def is_excluded(path: str, config: ReadingConfig) -> bool:
+    """Check if a file path matches any exclude_from_reading pattern.
+
+    Args:
+        path: Relative file path to check.
+        config: The reading config with exclude_from_reading patterns.
+
+    Returns:
+        True if the path matches any exclude pattern.
+    """
+    for pattern in config.exclude_from_reading:
+        if fnmatch(path, pattern):
+            return True
+    return False

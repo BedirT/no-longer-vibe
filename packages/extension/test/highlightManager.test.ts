@@ -458,10 +458,10 @@ describe("HighlightManager", () => {
       expect(appWithRanges).toBeDefined();
       // Critical tier: strong blue wash with thick border
       expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
-        "rgba(59, 130, 246, 0.12)",
+        "rgba(59, 130, 246, 0.14)",
       );
       expect(appWithRanges!.decorationType.options.borderLeft).toBe(
-        "4px solid rgba(59, 130, 246, 0.6)",
+        "4px solid rgba(59, 130, 246, 0.7)",
       );
     });
 
@@ -482,12 +482,12 @@ describe("HighlightManager", () => {
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
       expect(appWithRanges).toBeDefined();
-      // Important tier: medium blue wash with thin border
+      // Important tier: green wash with border
       expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
-        "rgba(59, 130, 246, 0.07)",
+        "rgba(34, 197, 94, 0.10)",
       );
       expect(appWithRanges!.decorationType.options.borderLeft).toBe(
-        "2px solid rgba(59, 130, 246, 0.4)",
+        "3px solid rgba(34, 197, 94, 0.5)",
       );
     });
 
@@ -508,11 +508,13 @@ describe("HighlightManager", () => {
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
       expect(appWithRanges).toBeDefined();
-      // Standard tier: subtle wash, no border
+      // Standard tier: grey wash with thin border
       expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
-        "rgba(59, 130, 246, 0.04)",
+        "rgba(148, 163, 184, 0.08)",
       );
-      expect(appWithRanges!.decorationType.options.borderLeft).toBeUndefined();
+      expect(appWithRanges!.decorationType.options.borderLeft).toBe(
+        "2px solid rgba(148, 163, 184, 0.3)",
+      );
     });
 
     it("uses low tier for importance < 0.25 (dead code)", () => {
@@ -532,9 +534,9 @@ describe("HighlightManager", () => {
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
       expect(appWithRanges).toBeDefined();
-      // Low tier: red tint for dead code
+      // Low tier: very subtle grey for low-use code
       expect(appWithRanges!.decorationType.options.backgroundColor).toBe(
-        "rgba(239, 68, 68, 0.03)",
+        "rgba(148, 163, 184, 0.04)",
       );
       expect(appWithRanges!.decorationType.options.borderLeft).toBeUndefined();
     });
@@ -572,7 +574,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.12)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.14)");
     });
 
     it("uses important tier just below 0.75", () => {
@@ -583,7 +585,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.07)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(34, 197, 94, 0.10)");
     });
 
     it("uses important tier at exact boundary 0.5", () => {
@@ -594,7 +596,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.07)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(34, 197, 94, 0.10)");
     });
 
     it("uses standard tier at exact boundary 0.25", () => {
@@ -605,7 +607,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.04)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(148, 163, 184, 0.08)");
     });
 
     it("handles importance 0.0 as low tier", () => {
@@ -616,7 +618,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(239, 68, 68, 0.03)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(148, 163, 184, 0.04)");
     });
 
     it("handles importance 1.0 as critical tier", () => {
@@ -627,7 +629,7 @@ describe("HighlightManager", () => {
       });
       const apps = __getDecorationApplications();
       const appWithRanges = apps.find((a) => a.ranges.length > 0);
-      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.12)");
+      expect(appWithRanges!.decorationType.options.backgroundColor).toBe("rgba(59, 130, 246, 0.14)");
     });
 
     it("ignores importance for non-focus styles", () => {

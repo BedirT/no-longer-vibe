@@ -17,6 +17,7 @@ from nlv.config import (
     ReadingConfig,
     TestFileMode,
     TieBreaking,
+    is_excluded,
     load_config,
     validate_config,
 )
@@ -357,3 +358,96 @@ class TestCustomPassOverrides:
         # "src/**" sorts before "src/types/**", so it wins
         result = match_custom_pass_override("src/types/user.py", cfg)
         assert result == "data_flow"
+
+
+# ---------------------------------------------------------------------------
+# exclude_from_reading
+# ---------------------------------------------------------------------------
+
+
+class TestExcludeFromReading:
+    """Tests for the exclude_from_reading config option."""
+
+    def test_default_is_empty(self) -> None:
+        cfg = ReadingConfig()
+        assert cfg.exclude_from_reading == ()
+
+    def test_custom_patterns(self) -> None:
+        cfg = ReadingConfig(
+            exclude_from_reading=("**/__init__.py", "**/__main__.py"),
+        )
+        assert len(cfg.exclude_from_reading) == 2
+
+    def test_load_from_json(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.json").write_text(json.dumps({
+            "exclude_from_reading": ["**/__init__.py"],
+        }))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ("**/__init__.py",)
+
+    def test_load_from_toml(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.toml").write_text(textwrap.dedent("""\
+            exclude_from_reading = ["**/__init__.py", "conftest.py"]
+        """))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ("**/__init__.py", "conftest.py")
+
+    def test_missing_key_defaults_to_empty(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.json").write_text(json.dumps({
+            "skip_tests": False,
+        }))
+        cfg = load_config(guide)
+        assert cfg.exclude_from_reading == ()
+
+    def test_non_string_items_raise(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        guide.mkdir()
+        (guide / "config.json").write_text(json.dumps({
+            "exclude_from_reading": [42, True],
+        }))
+        with pytest.raises(ValueError, match="exclude_from_reading"):
+            load_config(guide)
+
+
+# ---------------------------------------------------------------------------
+# is_excluded helper
+# ---------------------------------------------------------------------------
+
+
+class TestIsExcluded:
+    """Tests for the is_excluded glob-matching helper."""
+
+    def test_glob_match(self) -> None:
+        cfg = ReadingConfig(exclude_from_reading=("**/__init__.py",))
+        assert is_excluded("pkg/__init__.py", cfg) is True
+
+    def test_no_match(self) -> None:
+        cfg = ReadingConfig(exclude_from_reading=("**/__init__.py",))
+        assert is_excluded("pkg/core.py", cfg) is False
+
+    def test_empty_patterns(self) -> None:
+        cfg = ReadingConfig(exclude_from_reading=())
+        assert is_excluded("anything.py", cfg) is False
+
+    def test_exact_match(self) -> None:
+        cfg = ReadingConfig(exclude_from_reading=("conftest.py",))
+        assert is_excluded("conftest.py", cfg) is True
+
+    def test_nested_path_exact_no_match(self) -> None:
+        """Exact pattern 'conftest.py' does not match nested paths."""
+        cfg = ReadingConfig(exclude_from_reading=("conftest.py",))
+        assert is_excluded("tests/conftest.py", cfg) is False
+
+    def test_multiple_patterns_any_match(self) -> None:
+        cfg = ReadingConfig(
+            exclude_from_reading=("**/__init__.py", "conftest.py"),
+        )
+        assert is_excluded("pkg/__init__.py", cfg) is True
+        assert is_excluded("conftest.py", cfg) is True
+        assert is_excluded("src/app.py", cfg) is False
