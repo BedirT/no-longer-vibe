@@ -238,20 +238,14 @@ export function createStandaloneMcpServer(
         .describe("Line number to scroll to"),
     },
     async (args) => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("open_file", args);
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("open_file", args);
+          if (result) return result;
+        }
       }
-      const result: Record<string, unknown> = {
-        opened: true,
-        path: args.path,
-      };
-      if (args.line !== undefined) {
-        result.line = args.line;
-      }
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result) }],
-      };
+      return disconnectedError("open_file");
     },
   );
 
@@ -685,26 +679,14 @@ export function createStandaloneMcpServer(
         .describe("Importance weight (0.0-1.0). When provided with 'focus' style, renders opacity-tiered highlighting."),
     },
     async (args) => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("highlight_range", args);
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("highlight_range", args);
+          if (result) return result;
+        }
       }
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              success: true,
-              note: "VS Code extension not connected — no visual effect",
-              file: args.file,
-              startLine: args.startLine,
-              endLine: args.endLine,
-              style: args.style,
-              importance: args.importance,
-            }),
-          },
-        ],
-      };
+      return disconnectedError("highlight_range");
     },
   );
 
@@ -718,18 +700,14 @@ export function createStandaloneMcpServer(
         .describe("File path to clear, or omit to clear all"),
     },
     async (args) => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("clear_highlights", args);
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("clear_highlights", args);
+          if (result) return result;
+        }
       }
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ success: true }),
-          },
-        ],
-      };
+      return disconnectedError("clear_highlights");
     },
   );
 
@@ -752,23 +730,14 @@ export function createStandaloneMcpServer(
         .describe("CodeLens entries to display"),
     },
     async (args) => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("set_codelens", args);
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("set_codelens", args);
+          if (result) return result;
+        }
       }
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              success: true,
-              note: "VS Code extension not connected — no visual effect",
-              file: args.file,
-              entries: args.entries.length,
-            }),
-          },
-        ],
-      };
+      return disconnectedError("set_codelens");
     },
   );
 
@@ -777,18 +746,14 @@ export function createStandaloneMcpServer(
     "Clear the blast radius visualization",
     {},
     async () => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("clear_blast_radius", {});
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("clear_blast_radius", {});
+          if (result) return result;
+        }
       }
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ success: true }),
-          },
-        ],
-      };
+      return disconnectedError("clear_blast_radius");
     },
   );
 
@@ -797,18 +762,14 @@ export function createStandaloneMcpServer(
     "Reset all decorations, highlights, and visual state",
     {},
     async () => {
-      if (ipcClient?.isConnected()) {
-        const result = await ipcClient.callTool("clear_all", {});
-        if (result) return result;
+      if (ipcClient) {
+        await ipcClient.tryReconnect();
+        if (ipcClient.isConnected()) {
+          const result = await ipcClient.callTool("clear_all", {});
+          if (result) return result;
+        }
       }
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({ success: true }),
-          },
-        ],
-      };
+      return disconnectedError("clear_all");
     },
   );
 
@@ -820,6 +781,23 @@ export function createStandaloneMcpServer(
 function jsonResult(data: Record<string, unknown>) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+  };
+}
+
+/**
+ * Returns an MCP error response for visual tools when the VS Code
+ * extension is not connected. Uses `isError: true` so Claude knows
+ * the visual action did not happen.
+ */
+function disconnectedError(tool: string) {
+  return {
+    isError: true as const,
+    content: [
+      {
+        type: "text" as const,
+        text: `VS Code extension not connected — ${tool} had no visual effect. Ensure the No Longer Vibe extension is active in VS Code.`,
+      },
+    ],
   };
 }
 
@@ -860,8 +838,10 @@ if (isMainModule()) {
   const socketPath = getSocketPath(root);
   const client = new IpcBridgeClient(socketPath);
 
-  client.connect().then((connected) => {
-    const server = createStandaloneMcpServer(root, connected ? client : undefined);
+  // Always pass the client so visual tools can lazily reconnect
+  // even if the initial connection fails (extension not yet active).
+  client.connect().then(() => {
+    const server = createStandaloneMcpServer(root, client);
     const transport = new StdioServerTransport();
     server.server.connect(transport);
   });

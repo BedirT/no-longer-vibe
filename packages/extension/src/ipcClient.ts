@@ -78,6 +78,17 @@ export class IpcBridgeClient {
   }
 
   /**
+   * Attempts to reconnect if currently disconnected.
+   * Returns true if already connected or reconnection succeeded.
+   */
+  async tryReconnect(): Promise<boolean> {
+    if (this.connected) {
+      return true;
+    }
+    return this.connect();
+  }
+
+  /**
    * Forwards a tool call to the extension via the IPC socket.
    * Returns the result, or undefined if not connected or on error.
    */

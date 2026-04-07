@@ -120,16 +120,16 @@ class TestReadNextMcpIntegration:
             "read-next SKILL.md must reference the highlight_range MCP tool"
         )
 
-    def test_mentions_mark_read_tool(self) -> None:
+    def test_mentions_complete_file_tool(self) -> None:
         content = self._read_skill()
-        assert "mark_read" in content, (
-            "read-next SKILL.md must reference the mark_read MCP tool"
+        assert "complete_file" in content, (
+            "read-next SKILL.md must reference the complete_file MCP tool"
         )
 
-    def test_mentions_mark_flagged_tool(self) -> None:
+    def test_mentions_mark_export_read_tool(self) -> None:
         content = self._read_skill()
-        assert "mark_flagged" in content, (
-            "read-next SKILL.md must reference the mark_flagged MCP tool"
+        assert "mark_export_read" in content, (
+            "read-next SKILL.md must reference the mark_export_read MCP tool"
         )
 
     def test_mentions_clear_highlights_tool(self) -> None:

@@ -59,6 +59,11 @@ When visual MCP tools are available:
    style `"warning"` if the note references specific lines.
 3. **Clear highlights** on resolution and before the next file.
 
+If a visual tool returns `isError: true` with "not connected", the
+extension is not available. Fallback: skip visual MCP calls and
+continue with text-only review. The flagged review works fully
+without visual tools.
+
 ## Edge Cases
 
 - If no files are flagged, tell the user: "No flagged files. All clear."
