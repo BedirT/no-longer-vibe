@@ -793,3 +793,39 @@ class TestRefreshPreservesExistingProgress:
         assert data["files"]["a.py"]["status"] == "confirmed"
         assert data["files"]["b.py"]["status"] == "flagged"
         assert data["files"]["c.py"]["status"] == "unread"
+
+
+class TestRefreshResetsPointer:
+    """refresh_progress resets next_unread_index (BED-97)."""
+
+    def test_refresh_resets_pointer_to_zero(self, tmp_path: Path) -> None:
+        """After refresh, next_unread_index is reset to 0."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py", "c.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        mgr.update_file("a.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.update_file("b.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.advance_pointer(files)
+
+        data = mgr.load()
+        assert data["next_unread_index"] == 2
+
+        # Refresh with b.py modified (invalidated)
+        new_hashes = {
+            "a.py": hashlib.sha256(b"a.py").hexdigest()[:8],
+            "b.py": "modified_hash",
+            "c.py": hashlib.sha256(b"c.py").hexdigest()[:8],
+        }
+        new_map = _make_map_data(files, hashes=new_hashes)
+        new_map_hash = hashlib.sha256(
+            json.dumps(new_map).encode(),
+        ).hexdigest()
+
+        refresh_progress(guide_dir, new_map, new_map_hash)
+
+        data = mgr.load()
+        assert data["next_unread_index"] == 0

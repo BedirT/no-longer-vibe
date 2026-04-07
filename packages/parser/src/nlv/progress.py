@@ -92,6 +92,7 @@ class ProgressManager:
             "started_at": now,
             "last_session": now,
             "sessions": 1,
+            "next_unread_index": 0,
             "files": files,
             "stats": _compute_stats(files),
         }
@@ -230,6 +231,36 @@ class ProgressManager:
         commit: str | None = data.get("git_commit")
         branch: str | None = data.get("git_branch")
         return commit, branch
+
+    def advance_pointer(
+        self, reading_order_paths: list[str],
+    ) -> None:
+        """Advance next_unread_index to the next unread file.
+
+        Scans forward from the current pointer position through
+        *reading_order_paths* and sets the pointer to the first
+        unread file's index.  When no unread files remain, sets
+        the pointer to ``len(reading_order_paths)``.
+
+        Persists the result to disk.
+
+        Args:
+            reading_order_paths: File paths in reading-order sequence.
+        """
+        data = self._get_data()
+        files: dict[str, dict[str, Any]] = data.get("files", {})
+        start: int = data.get("next_unread_index", 0)
+
+        idx = start
+        while idx < len(reading_order_paths):
+            file_path = reading_order_paths[idx]
+            entry = files.get(file_path)
+            if entry and entry.get("status") == FileStatus.UNREAD.value:
+                break
+            idx += 1
+
+        data["next_unread_index"] = idx
+        self._save()
 
     def save(self) -> None:
         """Persist current in-memory progress data to disk.

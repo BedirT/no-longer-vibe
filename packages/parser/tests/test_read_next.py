@@ -945,3 +945,188 @@ class TestMissingFiles:
 
         with pytest.raises(FileNotFoundError):
             mgr.next_briefing()
+
+
+# --- Pointer optimization (BED-97) ---
+
+
+class TestPointerOptimization:
+    """next_unread_index pointer optimization (BED-97)."""
+
+    def test_complete_file_advances_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """Completing a file updates next_unread_index in progress."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        mgr = ReadNextManager(guide_dir)
+        mgr.next_briefing()
+        mgr.complete_file(
+            "src/config.py", action="confirmed", summary="Config.",
+        )
+
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        assert data["next_unread_index"] == 1
+
+    def test_sequential_completion_advances_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """Completing files 0 and 1 moves pointer to 2."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        mgr = ReadNextManager(guide_dir)
+        mgr.next_briefing()
+        mgr.complete_file(
+            "src/config.py", action="confirmed", summary="Config.",
+        )
+        mgr.next_briefing()
+        mgr.complete_file(
+            "src/models.py", action="confirmed", summary="Models.",
+        )
+
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        assert data["next_unread_index"] == 2
+
+    def test_out_of_order_completion_preserves_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """Completing a file ahead of the pointer doesn't skip unread."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = [
+            "src/config.py", "src/models.py",
+            "src/service.py", "src/api.py",
+        ]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        mgr = ReadNextManager(guide_dir)
+        mgr.next_briefing()
+        mgr.complete_file(
+            "src/config.py", action="confirmed", summary="Config.",
+        )
+
+        # Complete file at index 2 out of order (e.g. via /read-flagged)
+        mgr.complete_file(
+            "src/service.py", action="confirmed", summary="Service.",
+        )
+
+        # Pointer should still point to index 1 (src/models.py)
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        assert data["next_unread_index"] == 1
+
+        # And next_briefing should return src/models.py
+        briefing = mgr.next_briefing()
+        assert briefing.path == "src/models.py"
+
+    def test_pointer_survives_new_manager_instance(
+        self, tmp_path: Path,
+    ) -> None:
+        """New ReadNextManager uses the stored pointer."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        mgr1 = ReadNextManager(guide_dir)
+        mgr1.next_briefing()
+        mgr1.complete_file(
+            "src/config.py", action="confirmed", summary="Config.",
+        )
+
+        mgr2 = ReadNextManager(guide_dir)
+        briefing = mgr2.next_briefing()
+        assert briefing.path == "src/models.py"
+
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        assert data["next_unread_index"] == 1
+
+    def test_lookup_works_with_stale_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """When files are marked outside this manager, lookup still works."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(
+            guide_dir, map_data, map_hash,
+            updates={
+                "src/config.py": {
+                    "status": "confirmed", "summary": "Config.",
+                },
+                "src/models.py": {
+                    "status": "confirmed", "summary": "Models.",
+                },
+            },
+        )
+
+        # Pointer is 0 (stale) but lookup should still find api.py
+        mgr = ReadNextManager(guide_dir)
+        briefing = mgr.next_briefing()
+
+        assert briefing.path == "src/api.py"
+
+    def test_fallback_scan_finds_unread_before_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """Stale pointer falls back to scanning from index 0."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        # Manually set pointer past the end to simulate stale state
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        data["next_unread_index"] = 3
+        raw = json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr = ReadNextManager(guide_dir)
+        briefing = mgr.next_briefing()
+
+        # Fallback should find the first unread file
+        assert briefing.path == "src/config.py"
+
+    def test_pointer_beyond_array_length_returns_none(
+        self, tmp_path: Path,
+    ) -> None:
+        """Pointer past reading_order length still works gracefully."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(
+            guide_dir, map_data, map_hash,
+            updates={
+                "src/config.py": {
+                    "status": "confirmed", "summary": "Config.",
+                },
+            },
+        )
+
+        # Set pointer way past the end
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        data["next_unread_index"] = 999
+        raw = json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr = ReadNextManager(guide_dir)
+        with pytest.raises(AllFilesReadError):
+            mgr.next_briefing()
