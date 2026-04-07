@@ -301,11 +301,14 @@ def refresh_progress(
             "Pruned %d file(s) not in reading_order", len(pruned_paths),
         )
 
-    # 6. Update map_hash and recompute stats
+    # 6. Reset pointer — files may have been invalidated before it
+    old_data["next_unread_index"] = 0
+
+    # 7. Update map_hash and recompute stats
     old_data["map_hash"] = new_map_hash
     old_data["stats"] = mgr.compute_stats()
 
-    # 7. Save atomically
+    # 8. Save atomically
     mgr.save()
 
     return RefreshResult(

@@ -112,6 +112,7 @@ class ReadNextManager:
         map_data = _load_map(self._guide_dir)
         progress_data = self._progress_mgr.load()
 
+        # Always refresh from the just-loaded map data
         self._reading_order_paths = [
             e["path"] for e in map_data.get("reading_order", [])
         ]
@@ -138,8 +139,6 @@ class ReadNextManager:
         dep_statuses, dep_summaries = _collect_dep_info(
             progress_data, ro_entry,
         )
-
-        self._progress_mgr.advance_pointer(self._reading_order_paths)
 
         session_ctx = build_session_context(
             self._guide_dir, next_path,
@@ -275,9 +274,18 @@ def _find_next_unread(
         "reading_order", [],
     )
     files: dict[str, dict[str, Any]] = progress_data.get("files", {})
-    start: int = progress_data.get("next_unread_index", 0)
+    start = int(progress_data.get("next_unread_index", 0))
 
+    # Scan forward from pointer position
     for entry in reading_order[start:]:
+        path = entry["path"]
+        file_entry = files.get(path)
+        if file_entry and file_entry.get("status") == "unread":
+            return path
+
+    # Fallback: scan from beginning up to pointer position.
+    # Handles stale pointers after refresh or backward status changes.
+    for entry in reading_order[:start]:
         path = entry["path"]
         file_entry = files.get(path)
         if file_entry and file_entry.get("status") == "unread":

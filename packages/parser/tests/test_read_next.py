@@ -1054,10 +1054,10 @@ class TestPointerOptimization:
         data = pm.load()
         assert data["next_unread_index"] == 1
 
-    def test_next_briefing_updates_pointer_for_pre_read_files(
+    def test_lookup_works_with_stale_pointer(
         self, tmp_path: Path,
     ) -> None:
-        """When files are marked outside this manager, pointer catches up."""
+        """When files are marked outside this manager, lookup still works."""
         guide_dir = tmp_path / ".codebase-guide"
         files = ["src/config.py", "src/models.py", "src/api.py"]
         map_data = _make_map_data(files)
@@ -1074,11 +1074,61 @@ class TestPointerOptimization:
             },
         )
 
+        # Pointer is 0 (stale) but lookup should still find api.py
         mgr = ReadNextManager(guide_dir)
         briefing = mgr.next_briefing()
 
         assert briefing.path == "src/api.py"
 
+    def test_fallback_scan_finds_unread_before_pointer(
+        self, tmp_path: Path,
+    ) -> None:
+        """Stale pointer falls back to scanning from index 0."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py", "src/models.py", "src/api.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(guide_dir, map_data, map_hash)
+
+        # Manually set pointer past the end to simulate stale state
         pm = ProgressManager(guide_dir)
         data = pm.load()
-        assert data["next_unread_index"] == 2
+        data["next_unread_index"] = 3
+        import json as _json
+        raw = _json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr = ReadNextManager(guide_dir)
+        briefing = mgr.next_briefing()
+
+        # Fallback should find the first unread file
+        assert briefing.path == "src/config.py"
+
+    def test_pointer_beyond_array_length_returns_none(
+        self, tmp_path: Path,
+    ) -> None:
+        """Pointer past reading_order length still works gracefully."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["src/config.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+        _setup_progress(
+            guide_dir, map_data, map_hash,
+            updates={
+                "src/config.py": {
+                    "status": "confirmed", "summary": "Config.",
+                },
+            },
+        )
+
+        # Set pointer way past the end
+        pm = ProgressManager(guide_dir)
+        data = pm.load()
+        data["next_unread_index"] = 999
+        import json as _json
+        raw = _json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr = ReadNextManager(guide_dir)
+        with pytest.raises(AllFilesReadError):
+            mgr.next_briefing()
