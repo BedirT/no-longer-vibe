@@ -12,6 +12,7 @@ import {
   __getLastTreeView,
   __resetTreeView,
   __fireActiveEditorChange,
+  __setActiveEditor,
   Uri,
 } from "./__mocks__/vscode";
 import { dispose } from "../src/mapData";
@@ -111,7 +112,10 @@ describe("sidebar focus stealing (BED-149)", () => {
     __fireActiveEditorChange(editor);
 
     // reveal() SHOULD be called — user is already looking at the sidebar
-    expect(treeView!.reveal).toHaveBeenCalled();
+    expect(treeView!.reveal).toHaveBeenCalledWith(
+      expect.anything(),
+      { select: true, focus: false, expand: true },
+    );
   });
 
   it("does not call reveal() for files outside the workspace", async () => {
@@ -134,5 +138,35 @@ describe("sidebar focus stealing (BED-149)", () => {
     __fireActiveEditorChange(editor);
 
     expect(treeView!.reveal).not.toHaveBeenCalled();
+  });
+
+  it("does NOT reveal on startup when tree view is not visible", async () => {
+    vi.useFakeTimers();
+
+    __setFileContent("/mock/workspace/.codebase-guide/map.json", VALID_MAP);
+    __setFileContent(
+      "/mock/workspace/.codebase-guide/progress.json",
+      VALID_PROGRESS,
+    );
+
+    // Set an active editor BEFORE activation to trigger the startup reveal path
+    const editor = createMockEditor("/mock/workspace/src/config.ts");
+    __setActiveEditor(editor);
+
+    const ctx = createMockContext();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await activate(ctx as any);
+
+    const treeView = __getLastTreeView();
+    expect(treeView).toBeDefined();
+    treeView!.visible = false;
+
+    // Advance past the 500ms startup timeout
+    vi.advanceTimersByTime(600);
+
+    expect(treeView!.reveal).not.toHaveBeenCalled();
+
+    __setActiveEditor(undefined);
+    vi.useRealTimers();
   });
 });
