@@ -94,6 +94,7 @@ class ReadNextManager:
         self._guide_dir = guide_dir
         self._progress_mgr = ProgressManager(guide_dir)
         self._session_started = False
+        self._reading_order_paths: list[str] | None = None
 
     def next_briefing(self) -> NextBriefing:
         """Find the next unread file and build its briefing.
@@ -110,6 +111,10 @@ class ReadNextManager:
         """
         map_data = _load_map(self._guide_dir)
         progress_data = self._progress_mgr.load()
+
+        self._reading_order_paths = [
+            e["path"] for e in map_data.get("reading_order", [])
+        ]
 
         if not self._session_started:
             self._progress_mgr.start_session()
@@ -133,6 +138,8 @@ class ReadNextManager:
         dep_statuses, dep_summaries = _collect_dep_info(
             progress_data, ro_entry,
         )
+
+        self._progress_mgr.advance_pointer(self._reading_order_paths)
 
         session_ctx = build_session_context(
             self._guide_dir, next_path,
@@ -186,6 +193,19 @@ class ReadNextManager:
             note=note,
             summary=summary,
         )
+
+        ro_paths = self._get_reading_order_paths()
+        self._progress_mgr.advance_pointer(ro_paths)
+
+    def _get_reading_order_paths(self) -> list[str]:
+        """Return cached reading order paths, loading map if needed."""
+        if self._reading_order_paths is None:
+            map_data = _load_map(self._guide_dir)
+            self._reading_order_paths = [
+                e["path"]
+                for e in map_data.get("reading_order", [])
+            ]
+        return self._reading_order_paths
 
     def format_all_read(self) -> str:
         """Format a completion message when all files are read.
@@ -241,6 +261,9 @@ def _find_next_unread(
 ) -> str | None:
     """Find the next unread file in reading order.
 
+    Uses the ``next_unread_index`` pointer from progress data to
+    start scanning from the last known position instead of index 0.
+
     Args:
         map_data: Parsed map.json content.
         progress_data: Parsed progress.json content.
@@ -252,8 +275,9 @@ def _find_next_unread(
         "reading_order", [],
     )
     files: dict[str, dict[str, Any]] = progress_data.get("files", {})
+    start: int = progress_data.get("next_unread_index", 0)
 
-    for entry in reading_order:
+    for entry in reading_order[start:]:
         path = entry["path"]
         file_entry = files.get(path)
         if file_entry and file_entry.get("status") == "unread":
