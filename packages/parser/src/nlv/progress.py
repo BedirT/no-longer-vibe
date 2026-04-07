@@ -202,6 +202,35 @@ class ProgressManager:
             )
         return matches
 
+    def set_git_state(
+        self,
+        commit: str | None,
+        branch: str | None,
+    ) -> None:
+        """Store the git commit and branch in progress data.
+
+        Persists to disk atomically.
+
+        Args:
+            commit: Full SHA-1 of the git commit, or None to clear.
+            branch: Branch name, or None to clear.
+        """
+        data = self._get_data()
+        data["git_commit"] = commit
+        data["git_branch"] = branch
+        self._save()
+
+    def get_git_state(self) -> tuple[str | None, str | None]:
+        """Return the stored git commit and branch.
+
+        Returns:
+            Tuple of (commit, branch). Either may be None if not set.
+        """
+        data = self._get_data()
+        commit: str | None = data.get("git_commit")
+        branch: str | None = data.get("git_branch")
+        return commit, branch
+
     def save(self) -> None:
         """Persist current in-memory progress data to disk.
 

@@ -29,6 +29,7 @@ from pathlib import Path
 
 from nlv.analysis import compute_complexity, detect_entry_point
 from nlv.config import ReadingConfig, load_config
+from nlv.git import get_current_branch, get_head_commit
 from nlv.graph import DependencyGraph, build_graph
 from nlv.hashing import compute_content_hashes
 from nlv.layers import Layer, LayerClassification, classify_layers
@@ -150,7 +151,7 @@ def run_index(root: Path) -> IndexResult:
     )
 
     # Initialize or refresh progress.json
-    _init_progress(guide_dir, map_path, old_content_hashes)
+    _init_progress(guide_dir, map_path, old_content_hashes, repo_root=root)
 
     # Build result
     layer_counts = _count_layers(classification)
@@ -310,12 +311,18 @@ def _init_progress(
     guide_dir: Path,
     map_path: Path,
     old_content_hashes: dict[str, str],
+    *,
+    repo_root: Path | None = None,
 ) -> None:
     """Initialize or refresh progress.json from the generated map.json.
 
     If progress.json does not exist, creates a fresh one. If it does
     exist, runs the refresh logic to preserve reading progress on
     unchanged files (BED-102).
+
+    After creating or refreshing, records the current git HEAD commit
+    and branch in progress.json for git-based staleness detection
+    (BED-150).
     """
     map_content = map_path.read_text()
     map_data = json.loads(map_content)
@@ -332,6 +339,15 @@ def _init_progress(
     else:
         mgr = ProgressManager(guide_dir)
         mgr.create(map_data, map_hash)
+
+    # Record git state for git-based staleness detection (BED-150)
+    if repo_root is not None:
+        commit = get_head_commit(repo_root)
+        if commit is not None:
+            branch = get_current_branch(repo_root)
+            mgr = ProgressManager(guide_dir)
+            mgr.load()
+            mgr.set_git_state(commit, branch)
 
 
 def _filter_classification_to_reading_order(
