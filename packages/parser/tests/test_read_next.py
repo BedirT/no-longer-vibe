@@ -1094,8 +1094,7 @@ class TestPointerOptimization:
         pm = ProgressManager(guide_dir)
         data = pm.load()
         data["next_unread_index"] = 3
-        import json as _json
-        raw = _json.dumps(data, indent=2) + "\n"
+        raw = json.dumps(data, indent=2) + "\n"
         (guide_dir / "progress.json").write_text(raw)
 
         mgr = ReadNextManager(guide_dir)
@@ -1125,8 +1124,7 @@ class TestPointerOptimization:
         pm = ProgressManager(guide_dir)
         data = pm.load()
         data["next_unread_index"] = 999
-        import json as _json
-        raw = _json.dumps(data, indent=2) + "\n"
+        raw = json.dumps(data, indent=2) + "\n"
         (guide_dir / "progress.json").write_text(raw)
 
         mgr = ReadNextManager(guide_dir)

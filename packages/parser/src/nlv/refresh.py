@@ -535,7 +535,10 @@ def refresh_progress_from_git(
     files = data["files"]
     invalidated_count = _apply_diff_to_progress(files, diff, dep_graph)
 
-    # 11. Update stats and git state
+    # 11. Reset pointer — files may have been invalidated before it
+    data["next_unread_index"] = 0
+
+    # 12. Update stats and git state
     data["stats"] = mgr.compute_stats()
     current_branch = get_current_branch(repo_root)
     mgr.set_git_state(current_commit, current_branch)
