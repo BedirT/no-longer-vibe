@@ -87,7 +87,7 @@ class GoPlugin:
 
         return ParseResult(
             imports=tuple(sorted(imports, key=lambda r: r.source)),
-            exports=tuple(sorted(exports, key=lambda e: (e.name, e.line))),
+            exports=tuple(sorted(exports, key=lambda e: (e.line, e.name))),
             functions=tuple(
                 sorted(all_functions, key=lambda f: (f.line, f.name))
             ),

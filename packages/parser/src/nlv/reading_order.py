@@ -698,7 +698,14 @@ def _build_entries(
 
         imports = node.imports if node else ()
         imported_by = node.imported_by if node else ()
-        exports = tuple(e.name for e in result.exports) if result else ()
+        exports = (
+            tuple(
+                e.name
+                for e in sorted(result.exports, key=lambda e: (e.line, e.name))
+            )
+            if result
+            else ()
+        )
 
         reason = _build_reason(
             path=path,
