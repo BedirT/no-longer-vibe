@@ -288,7 +288,7 @@ describe("mcpStandalone", () => {
   });
 
   describe("open_file tool", () => {
-    it("returns opened status with path and line", async () => {
+    it("returns isError when no IPC client (not connected to VS Code)", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "open_file", {
@@ -296,29 +296,13 @@ describe("mcpStandalone", () => {
         line: 42,
       });
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.opened).toBe(true);
-      expect(parsed.path).toBe("src/config.ts");
-      expect(parsed.line).toBe(42);
-    });
-
-    it("returns opened status without line", async () => {
-      const mod = await import("../src/mcpStandalone");
-      const server = mod.createStandaloneMcpServer(tmpDir);
-      const result = await callTool(server, "open_file", {
-        path: "src/config.ts",
-      });
-
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.opened).toBe(true);
-      expect(parsed.path).toBe("src/config.ts");
-      expect(parsed.line).toBeUndefined();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
   });
 
-  describe("extension-only tools return success gracefully", () => {
-    it("highlight_range returns success with note", async () => {
+  describe("visual tools report disconnection honestly", () => {
+    it("highlight_range returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "highlight_range", {
@@ -328,23 +312,32 @@ describe("mcpStandalone", () => {
         style: "focus",
       });
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
-      expect(parsed.note).toContain("VS Code extension");
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
 
-    it("clear_highlights returns success", async () => {
+    it("open_file returns isError when no IPC client", async () => {
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      const result = await callTool(server, "open_file", {
+        path: "src/config.ts",
+        line: 42,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("clear_highlights returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "clear_highlights", {});
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
 
-    it("set_codelens returns success with note", async () => {
+    it("set_codelens returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "set_codelens", {
@@ -352,30 +345,26 @@ describe("mcpStandalone", () => {
         entries: [{ line: 1, text: "Called by: foo.ts" }],
       });
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
-      expect(parsed.note).toContain("VS Code extension");
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
 
-    it("clear_blast_radius returns success", async () => {
+    it("clear_blast_radius returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "clear_blast_radius", {});
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
 
-    it("clear_all returns success", async () => {
+    it("clear_all returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");
       const server = mod.createStandaloneMcpServer(tmpDir);
       const result = await callTool(server, "clear_all", {});
 
-      expect(result.isError).not.toBe(true);
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
   });
 });

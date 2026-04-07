@@ -76,6 +76,91 @@ describe("IPC Bridge", () => {
       await server.stop();
     });
 
+    it("tryReconnect succeeds when server becomes available", async () => {
+      const client = new IpcBridgeClient(socketPath);
+
+      // Initially no server — connect fails
+      const initialConnect = await client.connect();
+      expect(initialConnect).toBe(false);
+      expect(client.isConnected()).toBe(false);
+
+      // Start the server
+      const server = new IpcBridgeServer(socketPath, async () => ({
+        content: [{ type: "text", text: "ok" }],
+      }));
+      await server.start();
+
+      // tryReconnect should succeed now
+      const reconnected = await client.tryReconnect();
+      expect(reconnected).toBe(true);
+      expect(client.isConnected()).toBe(true);
+
+      client.disconnect();
+      await server.stop();
+    });
+
+    it("tryReconnect returns true when already connected", async () => {
+      const server = new IpcBridgeServer(socketPath, async () => ({
+        content: [{ type: "text", text: "ok" }],
+      }));
+      await server.start();
+
+      const client = new IpcBridgeClient(socketPath);
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+
+      // tryReconnect when already connected should be a no-op
+      const result = await client.tryReconnect();
+      expect(result).toBe(true);
+      expect(client.isConnected()).toBe(true);
+
+      client.disconnect();
+      await server.stop();
+    });
+
+    it("tryReconnect returns false when server is not available", async () => {
+      const client = new IpcBridgeClient(socketPath);
+
+      const result = await client.tryReconnect();
+      expect(result).toBe(false);
+      expect(client.isConnected()).toBe(false);
+    });
+
+    it("tryReconnect recovers after server restart", async () => {
+      const server = new IpcBridgeServer(socketPath, async () => ({
+        content: [{ type: "text", text: "ok" }],
+      }));
+      await server.start();
+
+      const client = new IpcBridgeClient(socketPath);
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+
+      // Server stops — client detects disconnection
+      await server.stop();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(client.isConnected()).toBe(false);
+
+      // Server restarts
+      const server2 = new IpcBridgeServer(socketPath, async () => ({
+        content: [{ type: "text", text: "ok2" }],
+      }));
+      await server2.start();
+
+      // tryReconnect should succeed
+      const reconnected = await client.tryReconnect();
+      expect(reconnected).toBe(true);
+      expect(client.isConnected()).toBe(true);
+
+      // Verify the new connection works
+      const result = await client.callTool("open_file", { path: "a.ts" });
+      expect(result).toBeDefined();
+      expect(result!.content[0].text).toBe("ok2");
+
+      client.disconnect();
+      await server2.stop();
+    });
+
     it("detects disconnection when server stops", async () => {
       const server = new IpcBridgeServer(socketPath, async () => ({
         content: [{ type: "text", text: "ok" }],

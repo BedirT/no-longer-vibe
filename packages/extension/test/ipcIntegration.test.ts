@@ -14,6 +14,8 @@ import { IpcBridgeServer } from "../src/ipcServer";
 import { IpcBridgeClient } from "../src/ipcClient";
 import { createStandaloneMcpServer } from "../src/mcpStandalone";
 
+// IpcBridgeClient is also used in disconnection/reconnection tests
+
 describe("MCP bridge integration", () => {
   let tmpDir: string;
   let guideDir: string;
@@ -159,8 +161,10 @@ describe("MCP bridge integration", () => {
   });
 
   describe("when VS Code extension is NOT running (no IPC)", () => {
-    it("highlight_range degrades gracefully with note", async () => {
-      const mcpServer = createStandaloneMcpServer(tmpDir);
+    it("highlight_range returns isError when disconnected", async () => {
+      // Pass a disconnected client (not undefined) to enable reconnection attempts
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
       const result = await callTool(mcpServer, "highlight_range", {
         file: "src/main.ts",
         startLine: 10,
@@ -168,9 +172,59 @@ describe("MCP bridge integration", () => {
         style: "focus",
       });
 
-      const parsed = JSON.parse(result.content[0].text);
-      expect(parsed.success).toBe(true);
-      expect(parsed.note).toContain("not connected");
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("open_file returns isError when disconnected", async () => {
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
+      const result = await callTool(mcpServer, "open_file", {
+        path: "src/config.ts",
+        line: 42,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("set_codelens returns isError when disconnected", async () => {
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
+      const result = await callTool(mcpServer, "set_codelens", {
+        file: "src/main.ts",
+        entries: [{ line: 1, text: "Called by: foo.ts" }],
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("clear_highlights returns isError when disconnected", async () => {
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
+      const result = await callTool(mcpServer, "clear_highlights", {});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("clear_blast_radius returns isError when disconnected", async () => {
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
+      const result = await callTool(mcpServer, "clear_blast_radius", {});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
+    });
+
+    it("clear_all returns isError when disconnected", async () => {
+      const disconnectedClient = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, disconnectedClient);
+      const result = await callTool(mcpServer, "clear_all", {});
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain("not connected");
     });
 
     it("mark_read still works fully", async () => {
@@ -192,6 +246,80 @@ describe("MCP bridge integration", () => {
       const progressPath = path.join(guideDir, "progress.json");
       const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
       expect(progress.files["src/auth.ts"].status).toBe("flagged");
+    });
+  });
+
+  describe("lazy reconnection", () => {
+    it("visual tools reconnect when server becomes available after initial failure", async () => {
+      // Start with disconnected client (no server yet)
+      const client = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, client);
+
+      // First call fails (no server)
+      const result1 = await callTool(mcpServer, "highlight_range", {
+        file: "src/main.ts",
+        startLine: 10,
+        endLine: 20,
+        style: "focus",
+      });
+      expect(result1.isError).toBe(true);
+
+      // Now start the extension IPC server
+      const receivedEvents: Array<{ tool: string }> = [];
+      const server = new IpcBridgeServer(
+        socketPath,
+        async (tool, _params) => {
+          receivedEvents.push({ tool });
+          return {
+            content: [{ type: "text", text: `[via extension] ${tool} executed` }],
+          };
+        },
+      );
+      await server.start();
+
+      // Second call should reconnect and forward to extension
+      const result2 = await callTool(mcpServer, "highlight_range", {
+        file: "src/main.ts",
+        startLine: 10,
+        endLine: 20,
+        style: "focus",
+      });
+      expect(result2.isError).not.toBe(true);
+      expect(result2.content[0].text).toContain("[via extension]");
+      expect(receivedEvents).toHaveLength(1);
+
+      client.disconnect();
+      await server.stop();
+    });
+
+    it("open_file reconnects when server becomes available", async () => {
+      const client = new IpcBridgeClient(socketPath);
+      const mcpServer = createStandaloneMcpServer(tmpDir, client);
+
+      // First call fails
+      const result1 = await callTool(mcpServer, "open_file", {
+        path: "src/main.ts",
+      });
+      expect(result1.isError).toBe(true);
+
+      // Start server
+      const server = new IpcBridgeServer(
+        socketPath,
+        async (tool) => ({
+          content: [{ type: "text", text: `[via extension] ${tool} executed` }],
+        }),
+      );
+      await server.start();
+
+      // Second call should work
+      const result2 = await callTool(mcpServer, "open_file", {
+        path: "src/main.ts",
+      });
+      expect(result2.isError).not.toBe(true);
+      expect(result2.content[0].text).toContain("[via extension]");
+
+      client.disconnect();
+      await server.stop();
     });
   });
 });
