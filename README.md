@@ -1,25 +1,82 @@
-# No Longer Vibe
+<p align="center">
+  <img src="docs/assets/nlv-logo.png" alt="No Longer Vibe" width="120" />
+</p>
 
-**Read your entire AI-generated codebase, fast, in smart order, with deterministic progress tracking.**
+<h1 align="center">No Longer Vibe</h1>
 
-You vibe-coded your app. You designed the architecture, wrote the foundation, then AI grew it massively. The project works. But there's a gap between "my project" and "my code." You want to close that gap by reading everything --- not searching, not skipping --- the way you would have understood it if you'd written it manually.
+<p align="center">
+  <strong>Systematically read and understand your entire AI-generated codebase.</strong>
+</p>
 
-**The math**: Vibe-code in 1x. Read and understand in 2x. Total 3x. Still ~7x faster than writing it yourself. This tool compresses that 2x.
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &bull;
+  <a href="#how-it-works">How It Works</a> &bull;
+  <a href="#the-reading-experience">Reading Experience</a> &bull;
+  <a href="#vs-code-extension">VS Code Extension</a> &bull;
+  <a href="SPEC.md">Full Spec</a>
+</p>
 
-Built as a Python parser + Claude Code skill + optional VS Code extension. Zero infrastructure.
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python&logoColor=white" alt="Python 3.11+" />
+  <img src="https://img.shields.io/badge/languages-Python%20%7C%20TypeScript%20%7C%20Go-green" alt="Languages" />
+  <img src="https://img.shields.io/badge/Claude%20Code-skill-blueviolet?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggNHoiLz48L3N2Zz4=" alt="Claude Code Skill" />
+  <img src="https://img.shields.io/badge/VS%20Code-extension-007ACC?logo=visual-studio-code&logoColor=white" alt="VS Code Extension" />
+  <img src="https://img.shields.io/badge/license-personal-lightgrey" alt="License" />
+</p>
 
 ---
 
-## Features
+<p align="center">
+  <a href="https://youtu.be/DEMO_VIDEO_ID">
+    <img src="docs/assets/demo-thumbnail.png" alt="Demo Video" width="720" />
+  </a>
+  <br />
+  <em>Watch: Reading a 400-file codebase in smart order with live AI context (2 min)</em>
+</p>
 
-- **Deterministic parsing** --- walks your file tree, parses ASTs, builds a dependency graph, and outputs `.codebase-guide/map.json`. Same repo = same output.
-- **Three-pass reading order** --- contract surfaces first (types, interfaces), then data flow paths, then utility code. Topologically sorted so you never read a file before its dependencies.
-- **Five architectural layers** --- foundation, core, features, integration, entry. Files classified by their position in the dependency graph.
-- **Three-tier completion tracking** --- mark files as confirmed (understood), flagged (needs revisit), or skimmed (shallow pass). Progress persists across sessions.
-- **Multi-language support** --- Python (ast module), TypeScript/JavaScript (tree-sitter), Go (tree-sitter). Plugin architecture for adding more.
-- **Incremental refresh** --- re-parse after changes, preserve progress on unchanged files, transitively invalidate downstream dependencies via SHA-256 content hashes.
-- **Session priming** --- compressed summaries of previously read files are fed to Claude at session start, so context carries across conversations.
-- **VS Code extension** --- file status colors, caller count gutter, CodeLens annotations, highlight ranges, progress sidebar, blast radius visualization. All controlled by Claude Code via MCP.
+---
+
+## The Problem
+
+You vibe-coded your app. You designed the architecture, wrote the foundation, then AI grew it massively. The project works. Ship it? Sure. But there's a gap between **"my project"** and **"my code."**
+
+You don't want to search for things. You don't want summaries. You want to **read everything** --- the way you would have understood it if you'd written it yourself.
+
+**The math:** Vibe-code in 1x. Read and understand in 2x. Total 3x. Still ~7x faster than writing it manually. **No Longer Vibe compresses that 2x.**
+
+---
+
+## How It Works
+
+Three components. Zero infrastructure. No LLM needed for the analysis.
+
+```
+  ┌──────────────────┐
+  │    nlv CLI        │  ← Deterministic Python parser
+  │  AST → Graph →   │    Same repo = same output, every time
+  │  → Reading Order  │
+  └────────┬─────────┘
+           │
+     map.json + progress.json
+           │
+     ┌─────┴──────────────────────┐
+     │                            │
+  ┌──▼──────────────┐   ┌────────▼────────────┐
+  │  Claude Code     │   │  VS Code Extension   │
+  │  Skills          │──▶│  (optional)           │
+  │                  │MCP│                       │
+  │  Sequences files,│   │  File decorations,    │
+  │  tracks progress,│   │  caller counts,       │
+  │  provides context│   │  blast radius,        │
+  └──────────────────┘   │  progress sidebar     │
+                         └───────────────────────┘
+```
+
+| Step | What happens |
+|------|-------------|
+| **1. Parse** | `nlv /path/to/project` walks your file tree, parses ASTs, builds a dependency graph, and outputs `.codebase-guide/map.json`. Deterministic --- no LLM, no API calls. |
+| **2. Read** | `/read-next` in Claude Code gives you the next file in smart order with full structural context. You read the code, ask Claude questions inline, mark it done. |
+| **3. Track** | Progress persists in `progress.json`. Pick up where you left off across sessions. `/read-status` shows exactly how far you are. |
 
 ---
 
@@ -27,10 +84,8 @@ Built as a Python parser + Claude Code skill + optional VS Code extension. Zero 
 
 ### Prerequisites
 
-- Python 3.11+
-- [uv](https://docs.astral.sh/uv/) package manager
+- Python 3.11+ with [uv](https://docs.astral.sh/uv/)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-- Node.js 18+ (only for the VS Code extension)
 
 ### Install
 
@@ -40,342 +95,267 @@ cd no-longer-vibe
 ./install.sh
 ```
 
-That's it. The installer sets up:
-- `nlv` CLI on your PATH
-- Claude Code skills (`/read-index`, `/read-next`, etc.)
-- VS Code extension (if VS Code is installed)
+This installs the `nlv` CLI, Claude Code skills, and (if VS Code is detected) the extension. You can also install components individually with `--parser-only`, `--skill-only`, or `--extension-only`.
 
-You can also install components individually:
-```bash
-./install.sh --parser-only     # just the CLI
-./install.sh --skill-only      # just Claude Code skills
-./install.sh --extension-only  # just VS Code extension
-```
-
-To uninstall everything: `./uninstall.sh`
-
-### Start reading
+### Start Reading
 
 ```bash
-nlv /path/to/your/project    # generate the codebase map
+# 1. Parse your project
+nlv /path/to/your/project
+
+# 2. Open Claude Code in that project, then:
+/read-next
 ```
 
-Open Claude Code and start reading:
-```
-/read-next           # get the next file with structural briefing
-                     # read the code, ask Claude questions inline
-done                 # mark as confirmed, move to next
-flag dual token store seems unnecessary   # flag for revisit
-/read-status         # check your progress
-```
+That's it. You're reading.
 
 ---
 
-## Parser CLI
+## The Reading Experience
 
-```
-nlv [path] [--verbose]
-```
+No Longer Vibe doesn't just hand you files alphabetically. It uses a **three-pass reading order** backed by research on how architects verify implementations:
 
-- `path` defaults to the current directory
-- `--verbose` enables debug logging
-- Output goes to `.codebase-guide/map.json`
+| Pass | What you read | Why this order |
+|------|--------------|----------------|
+| **1. Contracts** | Types, interfaces, public APIs, module boundaries | Pattern-match against your own design intent. Fast. |
+| **2. Data Flow** | Primary execution flows end-to-end | Spot where AI's approach diverged from yours. |
+| **3. Utility** | Helpers, error handlers, fallback logic | Where AI made the most autonomous decisions. |
 
-### Language Support
+Within each pass, files are **topologically sorted** --- you never read a file before its dependencies. Test files appear right after their implementation file.
 
-| Language | AST Parser | Import Resolution |
-|----------|-----------|-------------------|
-| Python | Built-in `ast` module | Relative/absolute import path resolution |
-| TypeScript / JavaScript | tree-sitter | Module path resolution with index file detection |
-| Go | tree-sitter | Package-based import resolution |
-
-The parser uses a plugin architecture. Each language implements the `LanguagePlugin` protocol: `parse_file()` for AST extraction and `resolve_import()` for dependency resolution.
-
-### Output: `.codebase-guide/map.json`
-
-```json
-{
-  "version": "1.0.0",
-  "repo_root": "/path/to/repo",
-  "generated_at": "2026-04-04T10:00:00Z",
-  "total_files": 387,
-  "content_hashes": {
-    "src/config.ts": "a3f2b8c1..."
-  },
-  "layers": {
-    "foundation": { "description": "No or minimal internal dependencies", "files": ["..."] },
-    "core":       { "description": "Depends only on foundation", "files": ["..."] },
-    "features":   { "description": "Business logic, depends on core", "files": ["..."] },
-    "integration":{ "description": "Composes features, middleware, API routes", "files": ["..."] },
-    "entry":      { "description": "App entry points, page-level composition", "files": ["..."] }
-  },
-  "reading_order": [
-    {
-      "index": 0,
-      "path": "src/config.ts",
-      "layer": "foundation",
-      "pass": "contracts",
-      "reason": "No dependencies. Defines core configuration used by 23 files.",
-      "complexity": "low",
-      "line_count": 45,
-      "imports": [],
-      "imported_by": ["src/models/user.ts", "src/services/db.ts"],
-      "exports": ["AppConfig", "getConfig", "DEFAULT_CONFIG"]
-    }
-  ],
-  "dependency_graph": {
-    "src/config.ts": {
-      "imports": [],
-      "imported_by": ["src/models/user.ts", "src/services/db.ts"]
-    }
-  }
-}
-```
-
----
-
-## Claude Code Skill
-
-Five slash commands that sequence files and track progress. The skill's job is to sequence and track. Claude Code handles understanding.
-
-### `/read-index [path]`
-
-Run the parser on the given path (defaults to `.`). Generates `.codebase-guide/map.json`.
-
-```
-Indexed 387 files across 5 layers:
-  foundation: 12 files (config, constants, types)
-  core: 48 files (models, services, data)
-  features: 189 files (components, routes, hooks)
-  integration: 97 files (api, middleware, pipeline)
-  entry: 41 files (pages, app, main)
-Reading order computed. Run /read-next to start.
-```
-
-### `/read-next`
-
-Shows the next unread file with structural context --- what layer it's in, what it imports (that you've already read), what imports it (that you'll read later), exports, and callers. Then reads the file content into the conversation.
-
-```
--- Next: src/middleware/auth.ts --------------------------
-Layer: integration | Lines: 142 | Complexity: medium
-
-Why now: All dependencies read.
-  [ok] src/config.ts (confirmed)
-  [ok] src/models/user.ts (confirmed)
-
-Exports: authMiddleware, requireRole, refreshToken
-Used by: src/api/routes.ts, src/app.ts (unread, later)
----------------------------------------------------------
-```
-
-Three responses after reading:
-
-| Response | Effect |
-|----------|--------|
-| `done` / `confirmed` | Marks as confirmed. You understand it. |
-| `flag <reason>` | Marks as flagged with your note. Needs a second pass. |
-| `skim` / `skimmed` | Marks as skimmed. Shallow pass, revisit later. |
-
-Any other message is treated as a question about the current file.
-
-### `/read-status`
-
-```
-Progress: 214/387 files (55%)
-  confirmed: 189
-  flagged: 18
-  skimmed: 7
-  unread: 173
-
-Current layer: features (41% complete)
-Next file: src/components/Dashboard.tsx
-Flagged files awaiting second pass: 18
-
-Sessions: 6 | Avg pace: ~35 files/session
-```
-
-### `/read-flagged`
-
-Second pass through flagged files only. Shows your original note for each file so you remember why you flagged it.
-
-### `/read-refresh`
-
-Re-runs the parser, diffs against the existing map. Unchanged files keep their progress. Modified files reset to unread. New files are added. Deleted files are removed. Downstream dependents of changed files are marked "potentially stale" via transitive invalidation.
-
-```
-Refreshed: /path/to/project
-  Unchanged: 380 files (progress preserved)
-  Modified: 3 files (reset to unread)
-  New: 2 files (added as unread)
-  Deleted: 1 file (removed)
-  Potentially stale: 7 files (dependency changed)
-```
-
-### Session Workflow
+### A Session Looks Like This
 
 ```
 You:     /read-next
-Claude:  [structural briefing for src/middleware/auth.ts]
-         [file content loaded into conversation]
 
-You:     why is there a dual token store? lines 47 and 52
-Claude:  [reads those lines, explains the pattern]
+Claude:  ── Next: src/middleware/auth.ts ──────────────────
+         Layer: integration │ Lines: 142 │ Complexity: medium
 
-You:     flag - dual token store seems unnecessary
-Claude:  Marked as flagged. Ready for next?
+         Why now: All dependencies read.
+           ✅ src/config.ts (confirmed)
+           ✅ src/models/user.ts (confirmed)
+
+         Exports: authMiddleware, requireRole, refreshToken
+         Used by: src/api/routes.ts, src/app.ts (unread, later)
+         ────────────────────────────────────────────────────
+
+         [reads file content into conversation]
+
+You:     Why is there a dual token store? Lines 47 and 52.
+
+Claude:  [explains the pattern, references config you already read]
+
+You:     flag - dual token store seems over-engineered
+
+Claude:  Flagged with note. Ready for next?
 
 You:     next
-Claude:  [briefing for next file...]
+Claude:  ── Next: src/services/cache.ts ─────────────────
+         ...
 ```
+
+### Three-Tier Completion
+
+Every file gets one of three marks:
+
+| Mark | Meaning | When to use |
+|------|---------|-------------|
+| **confirmed** | Understood. Matches your design intent. | `done` or `confirmed` |
+| **flagged** | Needs a second pass. Something surprised you. | `flag <reason>` |
+| **skimmed** | Read but want deeper review later. | `skim` |
+
+Run `/read-flagged` later to revisit everything you flagged, with your original notes.
+
+### Session Priming
+
+Context doesn't die between sessions. When you start a new session, `/read-next` feeds Claude compressed summaries of everything you've already read. You get orientation even if Claude doesn't remember the last conversation.
 
 ---
 
 ## VS Code Extension
 
-Optional enhancement layer. The extension reads `map.json` locally for responsive UI. Claude Code sends commands via MCP tools to orchestrate the visual narrative during reading sessions.
+<p align="center">
+  <img src="docs/assets/screenshot-extension-overview.png" alt="VS Code Extension Overview" width="720" />
+  <br />
+  <em>File status colors, caller count gutter, CodeLens annotations, and progress sidebar</em>
+</p>
 
-**Principle: Decoration, not puppeteering.** The extension adds visual context to what you're already looking at. It never moves your cursor, switches your tabs, or demands your attention.
+The optional VS Code extension adds visual context to your reading sessions. Claude Code controls it via MCP --- the extension is the display driver, Claude is the director.
 
-### Visual Features
+**Principle: Decoration, not puppeteering.** It adds context to what you're looking at. It never moves your cursor, switches your tabs, or demands attention.
 
-**File status decorations** --- green (confirmed), orange (flagged), blue (current file), no decoration (unread) in the VS Code explorer tree.
+### Caller Count Gutter
 
-**Caller count gutter** --- small number next to each function showing how many places call it. The single highest-value feature. "The moment I glance at a function and see 'called by: 0' and realize the AI generated dead code without me having to grep --- that's when this tool becomes non-negotiable."
+<p align="center">
+  <img src="docs/assets/screenshot-caller-count.png" alt="Caller Count Gutter" width="600" />
+</p>
 
-**CodeLens annotations** --- "Called by: auth.ts, routes.ts | Calls: db.query, logger.info" above each function. Clickable to navigate.
+A small number next to each function showing how many places call it. The single highest-value feature.
 
-**Highlight ranges** --- four styles: `focus` (subtle blue), `context` (light grey), `warning` (yellow), `blast-radius` (orange). Claude applies these during reading sessions to draw attention to relevant code.
+> *"The moment I glance at a function and see 'called by: 0' and realize the AI generated dead code without me having to grep --- that's when this tool becomes non-negotiable."*
 
-**Progress sidebar** --- tree view organized by layer, showing files with status icons and completion percentage per layer.
+### File Status Decorations
 
-**Blast radius** --- select a function, see all transitively affected files tint orange in the explorer. Claude explains the impact chain.
+<p align="center">
+  <img src="docs/assets/screenshot-file-status.png" alt="File Status Decorations" width="360" />
+</p>
 
-### MCP Tools
+Your explorer tree shows reading progress at a glance:
+- 🟢 **Green** --- confirmed (understood)
+- 🟠 **Orange** --- flagged (needs revisit)
+- 🔵 **Blue** --- currently reading
+- No decoration --- unread
 
-The extension exposes these tools via stdio MCP transport:
+### Blast Radius
 
-| Tool | Description |
-|------|-------------|
-| `highlight_range(file, startLine, endLine, style)` | Highlight lines with focus/context/warning/blast-radius style |
-| `clear_highlights(file?)` | Clear highlights from a file (or all files) |
-| `open_file(path, line?)` | Open a file, optionally at a specific line |
-| `mark_read(path)` | Mark a file as read in the explorer |
-| `mark_flagged(path, reason)` | Mark a file as flagged with a reason |
-| `set_codelens(file, entries)` | Set CodeLens annotations on a file |
-| `show_blast_radius(symbol)` | Visualize all files affected by changing a symbol |
-| `clear_blast_radius()` | Clear blast radius visualization |
-| `update_progress_tree()` | Refresh the progress sidebar |
-| `clear_all()` | Clear all decorations and highlights |
+<p align="center">
+  <img src="docs/assets/screenshot-blast-radius.png" alt="Blast Radius" width="600" />
+</p>
 
-### Install
+Select a function, see every file that would be affected if you changed it. All transitive dependents tint orange in the explorer. Claude explains the impact chain.
 
-```bash
-cd packages/extension
-npm install
-npm run build
-npx @vscode/vsce package --no-dependencies
+```
+You:     What happens if I change validateToken's signature?
+Claude:  → show_blast_radius("validateToken")
+
+[Explorer: 12 files tint orange. Sidebar highlights every
+ transitive dependent. Claude explains the impact chain.]
 ```
 
-Then install the `.vsix` file in VS Code: Extensions > "..." menu > "Install from VSIX..."
+### CodeLens Annotations
 
-The extension activates automatically when it detects `.codebase-guide/map.json` in the workspace.
+Clickable "Called by" and "Calls" annotations above each function:
+
+```
+Called by: router.ts, api.ts, ws.ts │ Calls: jwt.verify, db.findUser
+╭──────────────────────────────────────────────╮
+│ export function validateToken(token: string) {│
+│   ...                                         │
+│ }                                             │
+╰──────────────────────────────────────────────╯
+```
+
+### Progress Sidebar
+
+A tree view organized by architectural layer, showing files with status icons and completion percentage per layer. Always know where you are.
+
+---
+
+## All Commands
+
+| Command | What it does |
+|---------|-------------|
+| `nlv [path]` | Parse a codebase and generate `.codebase-guide/map.json` |
+| `/read-index [path]` | Run the parser from Claude Code |
+| `/read-next` | Next file in reading order with structural briefing |
+| `/read-status` | Current progress across all files and layers |
+| `/read-flagged` | Second pass through flagged files |
+| `/read-refresh` | Re-parse, preserve progress on unchanged files, invalidate stale dependencies |
+| `/read-overview` | High-level project orientation before diving in |
+
+---
+
+## Language Support
+
+| Language | AST Parser | Import Resolution |
+|----------|-----------|-------------------|
+| Python | Built-in `ast` module | Relative/absolute import paths |
+| TypeScript / JavaScript | tree-sitter | Module path resolution with index file detection |
+| Go | tree-sitter | Package-based import resolution |
+
+The parser uses a plugin architecture. Each language implements `parse_file()` and `resolve_import()`. Adding a new language means adding one file to `packages/parser/src/nlv/plugins/`.
+
+---
+
+## Five Architectural Layers
+
+The parser classifies every file into one of five layers based on its position in the dependency graph:
+
+```
+┌─────────────────────────────────────────────────┐
+│  entry          App entry points, page-level     │
+│                 composition (main.ts, app.ts)    │
+├─────────────────────────────────────────────────┤
+│  integration    Composes features, middleware,    │
+│                 API routes, pipelines            │
+├─────────────────────────────────────────────────┤
+│  features       Business logic, components,      │
+│                 routes, hooks                    │
+├─────────────────────────────────────────────────┤
+│  core           Models, services, data access    │
+│                 — depends only on foundation     │
+├─────────────────────────────────────────────────┤
+│  foundation     Config, constants, types — no    │
+│                 or minimal internal dependencies │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Configuration
 
-Place a `config.toml` or `config.json` in `.codebase-guide/` to customize reading order behavior. All options have sensible defaults.
-
-### `.codebase-guide/config.toml`
+Place a `config.toml` or `config.json` in `.codebase-guide/` to customize behavior:
 
 ```toml
-# Skip test files entirely from reading order
+# Skip test files from reading order
 skip_tests = false
 
-# Where to place unpaired test files: "contracts", "data_flow", "utility", "separate", "skip"
+# Where unpaired test files go: "contracts", "data_flow", "utility", "separate", "skip"
 test_pass = "utility"
 
-# Tie-breaking in topological sort: "alphabetical", "file_size", "complexity"
+# Tie-breaking: "alphabetical", "file_size", "complexity"
 tie_breaking = "alphabetical"
 
-# Minimum fan_in for depth 3+ files to qualify as integration layer
-integration_fan_in_threshold = 3
-
-# Override which pass specific files or globs go into
+# Force specific files into a pass
 [custom_pass_overrides]
 "src/types/**" = "contracts"
 "src/generated/**" = "utility"
 
-# Override layer depth thresholds
-[layer_thresholds]
-foundation = 0
-core = 1
-features = 2
-integration = 3
+# Exclude files from reading entirely
+[exclude_from_reading]
+patterns = ["**/*.generated.ts", "**/migrations/**"]
 ```
 
-### Test File Handling Modes
+<details>
+<summary>All configuration options</summary>
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `skip_tests` | `false` | Exclude test files from reading order |
+| `test_pass` | `"utility"` | Which pass unpaired test files go in |
+| `tie_breaking` | `"alphabetical"` | How to break ties in topological sort |
+| `integration_fan_in_threshold` | `3` | Minimum fan-in for integration layer |
+| `custom_pass_overrides` | `{}` | Force files/globs into specific passes |
+| `exclude_from_reading` | `{}` | Glob patterns to exclude entirely |
+| `layer_thresholds` | see below | Override layer depth boundaries |
+
+**Test file handling modes:**
 
 | Mode | Behavior |
 |------|----------|
-| `utility` (default) | Unpaired test files go in Pass 3 (utility). Paired tests follow their implementation file. |
-| `contracts` / `data_flow` | Place unpaired tests in the specified pass. |
-| `separate` | All tests go in a separate fourth pass after all non-test files. |
-| `skip` | Exclude test files from the reading order entirely. |
+| `utility` (default) | Unpaired tests go in Pass 3. Paired tests follow their implementation file. |
+| `contracts` / `data_flow` | Unpaired tests go in the specified pass. |
+| `separate` | All tests go in a fourth pass after non-test files. |
+| `skip` | Exclude test files entirely. |
 
-### Custom Pass Overrides
-
-Force specific files or glob patterns into a particular pass, regardless of heuristic classification:
-
-```toml
-[custom_pass_overrides]
-"src/types/**" = "contracts"          # all type definitions -> Pass 1
-"src/generated/**" = "utility"        # generated code -> Pass 3
-"src/core/registry.ts" = "contracts"  # specific file -> Pass 1
-```
+</details>
 
 ---
 
-## Architecture
+## Incremental Refresh
+
+Codebases change while you're reading. `/read-refresh` handles this:
 
 ```
-                  +-----------+
-                  |  Parser   |   Python CLI (deterministic)
-                  |  (nlv)    |   AST parsing, dependency graph,
-                  +-----+-----+   layer classification, reading order
-                        |
-                        v
-                  map.json + progress.json
-                        |
-              +---------+---------+
-              |                   |
-        +-----v-----+     +------v------+
-        |   Skill    |     |  Extension  |
-        | (Claude    |     |  (VS Code)  |
-        |  Code)     +----->             |
-        +------------+ MCP +-------------+
-         Sequences        Display driver:
-         files, tracks    file decorations,
-         progress,        caller count,
-         provides         CodeLens, blast
-         context          radius, sidebar
+Refreshed: /path/to/project
+  Unchanged: 380 files (progress preserved)
+  Modified:  3 files (reset to unread)
+  New:       2 files (added as unread)
+  Deleted:   1 file (removed)
+  Stale:     7 files (dependency changed upstream)
 ```
 
-**Parser** = source of truth. Deterministic. No LLM.
-
-**Skill** = director. Decides what to show and when. Manages reading sessions.
-
-**Extension** = display driver. Reads `map.json` locally. Responds to user clicks instantly. Claude sends MCP commands to orchestrate visuals.
-
-**MCP** = control channel, not data channel. Claude sends `show_blast_radius("validateToken")`, the extension resolves it against its local copy of the graph.
-
-### Design Constraints
-
-- **Max 3-4 simultaneous visual channels** --- beyond this, clutter blindness kicks in (Yeh & Wickens, 2001).
-- **No animated decorations.** No shimmer, no fading, no pulsing.
-- **No persistent inline AI explanations.** "If every function gets a ghosted comment, I will turn it off within an hour."
-- **No AI-written vs human-written markers.** "After I've reviewed and approved code, it's MY code."
+**Transitive invalidation:** When a file changes, its reverse dependencies get marked "potentially stale" even if their content hasn't changed. The dependency graph handles this automatically.
 
 ---
 
@@ -383,99 +363,74 @@ Force specific files or glob patterns into a particular pass, regardless of heur
 
 ```
 packages/
-  parser/          Python CLI --- AST parsing, dependency graph, reading order
+  parser/           Python CLI — the deterministic engine
     src/nlv/
-      cli.py         CLI entry point (nlv command)
-      index.py       Pipeline orchestrator (/read-index)
-      walker.py      File tree walker with .gitignore support
-      plugins/       Language plugins (Python, TypeScript, Go)
-      graph/         Dependency graph builder with cycle detection
-      layers.py      Architectural layer classifier
-      reading_order.py  Three-pass reading order computation
-      config.py      Configuration loading (TOML/JSON)
-      hashing.py     SHA-256 content hashing
-      analysis.py    Entry point detection, complexity scoring
-      output/        map.json generation
-      progress.py    progress.json management
-      refresh.py     Incremental refresh with transitive invalidation
-      read_next.py   /read-next structural briefing logic
-      read_status.py /read-status formatting
-      flagged.py     /read-flagged logic
-      session_priming.py  Compressed context for session starts
-  skill/           Claude Code skill definitions
-    install.sh       Skill installer (global or project-local)
-    read-index/      /read-index skill definition
-    read-next/       /read-next skill definition
-    read-status/     /read-status skill definition
-    read-flagged/    /read-flagged skill definition
-    read-refresh/    /read-refresh skill definition
-  extension/       VS Code extension (TypeScript)
+      cli.py          Entry point (nlv command)
+      plugins/        Language plugins (Python, TypeScript, Go)
+      graph/          Dependency graph with cycle detection
+      layers.py       Architectural layer classifier
+      reading_order.py  Three-pass reading order
+      refresh.py      Incremental refresh + transitive invalidation
+      ...
+
+  skill/            Claude Code skill definitions
+    read-index/       /read-index
+    read-next/        /read-next
+    read-status/      /read-status
+    read-flagged/     /read-flagged
+    read-refresh/     /read-refresh
+
+  extension/        VS Code extension (TypeScript)
     src/
-      extension.ts       Activation, wiring
-      mcpServer.ts       MCP stdio server with tool registrations
-      mapData.ts         map.json loading and watching
-      fileDecorationProvider.ts  File status colors
-      callerCount.ts     Gutter decorations
-      codeLensProvider.ts  Caller/callee CodeLens
-      progressTree.ts    Sidebar tree view
-      blastRadius.ts     Blast radius visualization
+      extension.ts          Activation + wiring
+      mcpServer.ts          MCP stdio server
+      callerCount.ts        Gutter decorations
+      codeLensProvider.ts   Caller/callee CodeLens
+      blastRadius.ts        Blast radius visualization
+      progressTree.ts       Sidebar tree view
+      ...
 ```
 
 ---
 
 ## Development
 
-### Parser (Python)
-
 ```bash
-uv sync                        # install dependencies
-uv run pytest -x               # run tests (fail-fast)
-uv run ruff check .            # lint
-uv run pyright                 # type check
-uv run pytest -x -k "test_name"  # run a single test
-```
+# Parser
+uv sync && uv run pytest -x          # test
+uv run ruff check .                   # lint
+uv run pyright                        # typecheck
 
-### Extension (TypeScript)
-
-```bash
+# Extension
 cd packages/extension
-npm install
-npm run build                  # esbuild bundle
-npm test                       # vitest
-npm run lint                   # eslint
-npm run watch                  # dev mode with auto-rebuild
-```
-
-### Full Check
-
-```bash
-./scripts/run-check.sh uv run pytest -x
-./scripts/run-check.sh uv run ruff check .
-./scripts/run-check.sh uv run pyright
+npm install && npm run build          # build
+npm test                              # test
 ```
 
 ---
 
-## Reading Order: The Three Passes
+## The Research Behind It
 
-Based on Dr. Park's research on architect-verifying-implementation:
+No Longer Vibe isn't arbitrary. The reading order and tool design are informed by research on how developers actually comprehend code:
 
-**Pass 1: Contract Surfaces** --- interfaces, type definitions, public APIs, module boundaries. Fast reading. You're pattern-matching against your own design intent.
+- **Three-pass order** is based on how architects verify implementations they didn't write (contracts → data flow → utility)
+- **No batch AI annotations** --- pre-generated summaries create passive learning, not active engagement ([Chi's ICAP framework, 2014](https://doi.org/10.1177/2372732215624857); [Kalyuga's redundancy effect, 2007](https://doi.org/10.1007/978-0-387-35386-4_9))
+- **Max 3-4 visual channels** in the extension --- beyond this threshold, clutter blindness makes users ignore everything ([Yeh & Wickens, 2001](https://doi.org/10.1177/001872080104300301))
+- **No animated decorations, no importance heatmaps** --- no consensus definition of "importance" in the literature. Caller count is measurable and actionable.
 
-**Pass 2: Data Flow Paths** --- primary execution flows end-to-end. Not file-by-file but flow-by-flow. Detects where AI's approach diverged from yours.
-
-**Pass 3: Utility and Edge-Case Code** --- helper functions, error handlers, fallback logic. Where the AI made the most autonomous decisions.
-
-Within each pass, files are topologically sorted so you never read a file before its dependencies. Ties are broken by layer (foundation first), then fan-in (most-imported first), then alphabetical.
-
-Test files are co-located with their implementation: after an implementation file, its paired test files appear immediately.
+See [SPEC.md](SPEC.md) for the full technical specification and [ROUNDTABLE.md](ROUNDTABLE.md) for the design rationale.
 
 ---
 
-## Design References
+## Design Principles
 
-- [SPEC.md](SPEC.md) --- full technical specification
-- [ROUNDTABLE.md](ROUNDTABLE.md) --- design rationale and research backing
+1. **Deterministic foundation.** Parser output is pure function of source code. No LLM in the analysis pipeline.
+2. **Live over batch.** Claude Code provides understanding in conversation. No pre-generated summaries that go stale.
+3. **Decoration, not puppeteering.** The extension augments what you see. It never moves your cursor or switches your tabs.
+4. **Completeness is measurable.** Progress tracking gives you an exit condition: you're done when all files are confirmed.
+5. **After you review it, it's your code.** No permanent AI-written-vs-human markers.
+
+---
 
 ## Roadmap
 
@@ -483,10 +438,18 @@ Tracked in [Linear](https://linear.app/bedirt/project/no-longer-vibe-26858b33c0f
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| Phase 1: Core | Parser + Skill (BED-57 -- BED-79) | Complete |
-| Phase 2: Extension Tier 1 | VS Code basics (BED-80 -- BED-86) | Complete |
-| Phase 3: Iterate & Polish | CodeLens, blast radius, more languages (BED-87 -- BED-92) | Complete |
+| Phase 1: Core | Parser + Claude Code Skills | ✅ Complete |
+| Phase 2: Extension Tier 1 | File decorations, caller count, highlights | ✅ Complete |
+| Phase 3: Iterate & Polish | CodeLens, blast radius, sidebar, more languages | ✅ Complete |
+
+---
 
 ## License
 
 Personal tool. Not a product.
+
+---
+
+<p align="center">
+  <em>Built for the gap between "my project" and "my code."</em>
+</p>
