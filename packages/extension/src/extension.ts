@@ -189,10 +189,10 @@ export async function activate(
       if (!filePath.startsWith(workspaceRoot)) return;
       const relativePath = filePath.slice(workspaceRoot.length + 1);
       const item = progressTree.ensureFileItem(relativePath);
-      if (item) {
+      if (item && progressTreeView.visible) {
         progressTreeView.reveal(item, { select: true, focus: false, expand: true }).then(
           undefined,
-          () => { /* tree not visible or item not found */ },
+          () => { /* item not found */ },
         );
       }
     };
