@@ -327,6 +327,35 @@ export function __resetDecorationTracking(): void {
   decorationApplications = [];
 }
 
+/** Mock TreeView returned by createTreeView. */
+interface MockTreeView {
+  dispose: () => void;
+  reveal: (...args: unknown[]) => Promise<void>;
+  visible: boolean;
+}
+
+let lastCreatedTreeView: MockTreeView | undefined;
+
+/** Returns the most recently created mock tree view for test assertions. */
+export function __getLastTreeView(): MockTreeView | undefined {
+  return lastCreatedTreeView;
+}
+
+/** Resets mock tree view state between tests. */
+export function __resetTreeView(): void {
+  lastCreatedTreeView = undefined;
+}
+
+/** EventEmitter for onDidChangeActiveTextEditor. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const activeEditorChangeEmitter = new EventEmitter<any>();
+
+/** Fire onDidChangeActiveTextEditor event in tests. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function __fireActiveEditorChange(editor: any): void {
+  activeEditorChangeEmitter.fire(editor);
+}
+
 /** Active text editor mock. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockActiveTextEditor: any = undefined;
@@ -476,11 +505,23 @@ export const window = {
     },
   ),
   createTreeView: vi.fn(
-    (_viewId: string, _options: unknown): { dispose: () => void; reveal: (...args: unknown[]) => Promise<void> } => {
-      return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (_viewId: string, options: { treeDataProvider?: any }): MockTreeView => {
+      const tv: MockTreeView = {
         dispose: () => {},
         reveal: vi.fn(async () => {}),
+        visible: false,
       };
+      lastCreatedTreeView = tv;
+      // Mimic VS Code: subscribe to onDidChangeTreeData → call getChildren()
+      // to populate the tree provider's internal caches.
+      const provider = options?.treeDataProvider;
+      if (provider?.onDidChangeTreeData) {
+        provider.onDidChangeTreeData(() => {
+          provider.getChildren();
+        });
+      }
+      return tv;
     },
   ),
   createTextEditorDecorationType: vi.fn(
@@ -490,11 +531,7 @@ export const window = {
       return decType;
     },
   ),
-  onDidChangeActiveTextEditor: vi.fn((_listener: () => void) => {
-    return new Disposable(() => {
-      // noop
-    });
-  }),
+  onDidChangeActiveTextEditor: activeEditorChangeEmitter.event,
   get visibleTextEditors() {
     return mockVisibleTextEditors;
   },
