@@ -967,6 +967,42 @@ describe("ProgressTreeProvider", () => {
     });
   });
 
+  describe("export source order (BED-148)", () => {
+    it("preserves export order from map data (source order)", () => {
+      const map = makeMap();
+      // Exports deliberately in non-alphabetical order (simulating source order)
+      map.reading_order[0].exports = ["getConfig", "AppConfig", "initialize"];
+
+      provider.updateMapData(map);
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const files = getFilesFromLayer(provider, foundationLayer);
+      const exports = provider.getChildren(files[0]);
+
+      const labels = exports.map((e) => e.label);
+      expect(labels).toEqual(["getConfig", "AppConfig", "initialize"]);
+    });
+
+    it("does not sort exports alphabetically", () => {
+      const map = makeMap();
+      // "zebra" before "alpha" — source order must be preserved
+      map.reading_order[1].exports = ["zebra", "alpha", "middle"];
+
+      provider.updateMapData(map);
+      const layers = provider.getChildren();
+      const coreLayer = layers.find(
+        (l) => l.contextValue === "layer:core",
+      )!;
+      const files = getFilesFromLayer(provider, coreLayer);
+      const exports = provider.getChildren(files[0]);
+
+      const labels = exports.map((e) => e.label);
+      expect(labels).toEqual(["zebra", "alpha", "middle"]);
+    });
+  });
+
   describe("dispose", () => {
     it("can be called without error", () => {
       provider.updateMapData(makeMap());

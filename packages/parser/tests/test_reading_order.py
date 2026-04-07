@@ -969,3 +969,64 @@ class TestReadingOrderRealistic:
         paths = [e.path for e in order]
         if "model.py" in paths and "test_model.py" in paths:
             assert paths.index("test_model.py") == paths.index("model.py") + 1
+
+
+# ---------------------------------------------------------------------------
+# Export source-order tests (BED-148)
+# ---------------------------------------------------------------------------
+
+
+class TestExportSourceOrder:
+    """Exports in ReadingOrderEntry must be sorted by source line number."""
+
+    def test_exports_sorted_by_line_number(self) -> None:
+        """Exports appear in source (line number) order, not alphabetical."""
+        results = {
+            "src/utils.py": ParseResult(
+                imports=(),
+                exports=(
+                    ExportRef(name="zebra", kind=ExportKind.FUNCTION, line=5),
+                    ExportRef(name="alpha", kind=ExportKind.FUNCTION, line=15),
+                    ExportRef(name="middle", kind=ExportKind.FUNCTION, line=10),
+                ),
+                functions=(),
+                entry_point=False,
+            ),
+        }
+        graph = _build_test_graph(results, resolved={})
+        classification = _build_classification(graph)
+
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+        )
+
+        entry = next(e for e in order if e.path == "src/utils.py")
+        assert entry.exports == ("zebra", "middle", "alpha")
+
+    def test_exports_with_same_line_use_stable_order(self) -> None:
+        """When two exports share a line, order is stable (name as tiebreak)."""
+        results = {
+            "src/types.py": ParseResult(
+                imports=(),
+                exports=(
+                    ExportRef(name="TypeB", kind=ExportKind.TYPE, line=1),
+                    ExportRef(name="TypeA", kind=ExportKind.TYPE, line=1),
+                    ExportRef(name="Config", kind=ExportKind.CLASS, line=10),
+                ),
+                functions=(),
+                entry_point=False,
+            ),
+        }
+        graph = _build_test_graph(results, resolved={})
+        classification = _build_classification(graph)
+
+        order = compute_reading_order(
+            graph=graph,
+            classification=classification,
+            parse_results=results,
+        )
+
+        entry = next(e for e in order if e.path == "src/types.py")
+        assert entry.exports == ("TypeA", "TypeB", "Config")
