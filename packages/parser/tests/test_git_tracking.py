@@ -1,7 +1,10 @@
 """Tests for git-based progress tracking integration (BED-150).
 
 Covers: git state in progress.json, git-diff-to-DiffResult conversion,
-refresh_progress_from_git end-to-end, and index pipeline git recording.
+refresh_progress_from_git end-to-end, guide-dir filtering, and index
+pipeline git recording.
+
+The ``git_repo`` fixture is provided by conftest.py.
 """
 
 from __future__ import annotations
@@ -12,38 +15,13 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from nlv.git import get_head_commit
 from nlv.progress import FileStatus, ProgressManager
 from nlv.refresh import (
-    DiffResult,
+    _filter_guide_dir_entries,
     git_diff_to_diff_result,
     refresh_progress_from_git,
 )
-
-
-# ---------------------------------------------------------------------------
-# Fixtures & helpers
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture()
-def git_repo(tmp_path: Path) -> Path:
-    """Create a minimal git repo with one commit."""
-    subprocess.run(
-        ["git", "init", "--initial-branch=main"],
-        cwd=tmp_path, capture_output=True, check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.email", "test@test.com"],
-        cwd=tmp_path, capture_output=True, check=True,
-    )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"],
-        cwd=tmp_path, capture_output=True, check=True,
-    )
-    return tmp_path
 
 
 def _git_commit(repo: Path, msg: str) -> str:
@@ -258,13 +236,16 @@ class TestProgressGitState:
 
 
 class TestRefreshFromGitBasic:
-    """Git-based refresh: modified, deleted, added, unchanged handling."""
+    """Git-based refresh: modified, deleted, added, unchanged handling.
+
+    The ``git_repo`` fixture provides a repo with a.py and b.py already
+    committed. Tests use ``get_head_commit`` as the base commit.
+    """
 
     def test_modified_files_marked_unread(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# file a\n")
-        (git_repo / "b.py").write_text("# file b\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py", "b.py"]
         map_data = _make_map_data(files)
@@ -288,9 +269,8 @@ class TestRefreshFromGitBasic:
 
     def test_deleted_files_removed(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        (git_repo / "b.py").write_text("# b\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py", "b.py"]
         map_data = _make_map_data(files)
@@ -313,8 +293,8 @@ class TestRefreshFromGitBasic:
 
     def test_added_files_detected(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py"]
         map_data = _make_map_data(files)
@@ -333,9 +313,8 @@ class TestRefreshFromGitBasic:
 
     def test_unchanged_files_preserve_status(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        (git_repo / "b.py").write_text("# b\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py", "b.py"]
         map_data = _make_map_data(files)
@@ -358,8 +337,8 @@ class TestRefreshFromGitBasic:
 
     def test_same_commit_no_changes(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py"]
         map_data = _make_map_data(files)
@@ -390,9 +369,8 @@ class TestRefreshFromGitTransitive:
 
     def test_direct_dependent_flagged(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        (git_repo / "b.py").write_text("# b\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         dep_graph = {
             "a.py": {"imports": [], "imported_by": ["b.py"]},
@@ -421,10 +399,11 @@ class TestRefreshFromGitTransitive:
     def test_transitive_chain_flagged(self, git_repo: Path) -> None:
         """a.py -> b.py -> c.py: modifying a.py flags both b and c."""
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        (git_repo / "b.py").write_text("# b\n")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
+        # c.py doesn't exist in fixture — add it
         (git_repo / "c.py").write_text("# c\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = _git_commit(git_repo, "add c.py")
 
         dep_graph = {
             "a.py": {"imports": [], "imported_by": ["b.py"]},
@@ -462,8 +441,8 @@ class TestRefreshFromGitStateUpdates:
 
     def test_updates_stored_git_commit(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        old_commit = _git_commit(git_repo, "initial")
+        old_commit = get_head_commit(git_repo)
+        assert old_commit is not None
 
         files = ["a.py"]
         map_data = _make_map_data(files)
@@ -483,11 +462,10 @@ class TestRefreshFromGitStateUpdates:
 
     def test_updates_stats_after_refresh(self, git_repo: Path) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        (git_repo / "b.py").write_text("# b\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
-        files = ["a.py", "b.py"]
+        files = ["a.py", "b.py"]  # already in fixture
         map_data = _make_map_data(files)
         _setup_progress(
             guide_dir, map_data,
@@ -539,8 +517,6 @@ class TestRefreshFromGitFallbacks:
         self, git_repo: Path,
     ) -> None:
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        _git_commit(git_repo, "initial")
 
         files = ["a.py"]
         map_data = _make_map_data(files)
@@ -555,8 +531,8 @@ class TestRefreshFromGitFallbacks:
     def test_returns_none_when_no_map_json(self, git_repo: Path) -> None:
         """If map.json is missing, can't get dep graph for invalidation."""
         guide_dir = git_repo / ".codebase-guide"
-        (git_repo / "a.py").write_text("# a\n")
-        commit = _git_commit(git_repo, "initial")
+        commit = get_head_commit(git_repo)
+        assert commit is not None
 
         files = ["a.py"]
         map_data = _make_map_data(files)
@@ -569,8 +545,52 @@ class TestRefreshFromGitFallbacks:
         mgr.create(map_data, map_hash)
         mgr.set_git_state(commit, "main")
 
-        (git_repo / "a.py").write_text("# changed\n")
-        _git_commit(git_repo, "modify")
+        (git_repo / "a.py").write_text("# changed content\n")
+        _git_commit(git_repo, "modify a.py")
 
         result = refresh_progress_from_git(guide_dir, git_repo)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _filter_guide_dir_entries
+# ---------------------------------------------------------------------------
+
+
+class TestFilterGuideDirEntries:
+    """Filtering .codebase-guide paths from git diff entries."""
+
+    def test_filters_entries_under_guide_dir(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        entries: list[tuple[str, ...]] = [
+            ("A", ".codebase-guide/map.json"),
+            ("M", "a.py"),
+            ("A", ".codebase-guide/progress.json"),
+        ]
+        result = _filter_guide_dir_entries(entries, guide, tmp_path)
+        assert result == [("M", "a.py")]
+
+    def test_preserves_source_entries(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        entries: list[tuple[str, ...]] = [
+            ("M", "src/a.py"),
+            ("A", "src/b.py"),
+        ]
+        result = _filter_guide_dir_entries(entries, guide, tmp_path)
+        assert result == entries
+
+    def test_guide_dir_outside_repo_returns_all(self, tmp_path: Path) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        guide = tmp_path / "other" / ".codebase-guide"
+        entries: list[tuple[str, ...]] = [
+            ("M", "a.py"),
+            ("A", ".codebase-guide/map.json"),
+        ]
+        result = _filter_guide_dir_entries(entries, guide, repo)
+        assert result == entries
+
+    def test_empty_entries(self, tmp_path: Path) -> None:
+        guide = tmp_path / ".codebase-guide"
+        result = _filter_guide_dir_entries([], guide, tmp_path)
+        assert result == []

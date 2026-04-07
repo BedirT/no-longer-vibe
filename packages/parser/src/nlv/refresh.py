@@ -183,6 +183,67 @@ def _walk_reverse_dependencies(
 # ---------------------------------------------------------------------------
 
 
+def _apply_diff_to_progress(
+    files: dict[str, dict[str, Any]],
+    diff: DiffResult,
+    dep_graph: dict[str, dict[str, list[str]]],
+) -> int:
+    """Apply a DiffResult to progress file entries.
+
+    Handles removing deleted files, resetting modified files to unread,
+    adding new files as unread, and walking reverse dependency edges
+    for transitive invalidation.
+
+    Args:
+        files: The ``files`` dict from progress.json (mutated in place).
+        diff: The computed diff (hash-based or git-based).
+        dep_graph: The ``dependency_graph`` from map.json.
+
+    Returns:
+        Count of transitively invalidated files.
+    """
+    _UNREAD_ENTRY: dict[str, Any] = {
+        "status": FileStatus.UNREAD.value,
+        "read_at": None,
+        "note": None,
+        "summary": None,
+    }
+
+    # Remove deleted files
+    for path in diff.removed_files:
+        files.pop(path, None)
+
+    # Reset modified files to unread (only if tracked)
+    for path in diff.modified_files:
+        if path in files:
+            files[path] = dict(_UNREAD_ENTRY)
+
+    # Add new files as unread (preserve existing progress)
+    for path in diff.new_files:
+        if path not in files:
+            files[path] = dict(_UNREAD_ENTRY)
+
+    # Transitive invalidation — exclude files already unread or
+    # just modified/newly added
+    already_handled = set(diff.modified_files) | set(diff.new_files)
+    for path in diff.unchanged_files:
+        if files.get(path, {}).get("status") == FileStatus.UNREAD.value:
+            already_handled.add(path)
+
+    stale_files = _walk_reverse_dependencies(
+        diff.modified_files, dep_graph, exclude=already_handled,
+    )
+
+    invalidated_count = 0
+    for path, note in stale_files.items():
+        if path in files:
+            files[path]["status"] = FileStatus.FLAGGED.value
+            files[path]["note"] = note
+            invalidated_count += 1
+
+    return invalidated_count
+
+
 def refresh_progress(
     guide_dir: Path,
     new_map: dict[str, Any],
@@ -225,47 +286,7 @@ def refresh_progress(
     diff = diff_content_hashes(old_hashes, new_hashes)
 
     files = old_data["files"]
-
-    # 1. Remove deleted files
-    for path in diff.removed_files:
-        files.pop(path, None)
-
-    # 2. Reset modified files to unread
-    for path in diff.modified_files:
-        files[path] = {
-            "status": FileStatus.UNREAD.value,
-            "read_at": None,
-            "note": None,
-            "summary": None,
-        }
-
-    # 3. Add new files as unread (preserve existing progress if already tracked)
-    for path in diff.new_files:
-        if path not in files:
-            files[path] = {
-                "status": FileStatus.UNREAD.value,
-                "read_at": None,
-                "note": None,
-                "summary": None,
-            }
-
-    # 4. Transitive invalidation — exclude files that are already
-    #    unread or were just modified/newly added
-    already_handled = set(diff.modified_files) | set(diff.new_files)
-    for path in diff.unchanged_files:
-        if files.get(path, {}).get("status") == FileStatus.UNREAD.value:
-            already_handled.add(path)
-
-    stale_files = _walk_reverse_dependencies(
-        diff.modified_files, dep_graph, exclude=already_handled,
-    )
-
-    invalidated_count = 0
-    for path, note in stale_files.items():
-        if path in files:
-            files[path]["status"] = FileStatus.FLAGGED.value
-            files[path]["note"] = note
-            invalidated_count += 1
+    invalidated_count = _apply_diff_to_progress(files, diff, dep_graph)
 
     # 5. Prune files not in reading_order (excluded by trivial init
     #    filter, config exclude_from_reading patterns, etc.)
@@ -507,57 +528,14 @@ def refresh_progress_from_git(
     tracked_files = set(data["files"].keys())
     diff = git_diff_to_diff_result(diff_entries, tracked_files)
 
+    # 10. Apply changes (shared with hash-based refresh)
     files = data["files"]
+    invalidated_count = _apply_diff_to_progress(files, diff, dep_graph)
 
-    # 10. Apply changes (same logic as hash-based refresh)
-
-    # Remove deleted files
-    for path in diff.removed_files:
-        files.pop(path, None)
-
-    # Reset modified files to unread
-    for path in diff.modified_files:
-        if path in files:
-            files[path] = {
-                "status": FileStatus.UNREAD.value,
-                "read_at": None,
-                "note": None,
-                "summary": None,
-            }
-
-    # Track new files (not added to reading order — needs re-index)
-    for path in diff.new_files:
-        if path not in files:
-            files[path] = {
-                "status": FileStatus.UNREAD.value,
-                "read_at": None,
-                "note": None,
-                "summary": None,
-            }
-
-    # 11. Transitive invalidation
-    already_handled = set(diff.modified_files) | set(diff.new_files)
-    for path in diff.unchanged_files:
-        if files.get(path, {}).get("status") == FileStatus.UNREAD.value:
-            already_handled.add(path)
-
-    stale_files = _walk_reverse_dependencies(
-        diff.modified_files, dep_graph, exclude=already_handled,
-    )
-
-    invalidated_count = 0
-    for path, note in stale_files.items():
-        if path in files:
-            files[path]["status"] = FileStatus.FLAGGED.value
-            files[path]["note"] = note
-            invalidated_count += 1
-
-    # 12. Update stats and git state
+    # 11. Update stats and git state
     data["stats"] = mgr.compute_stats()
     current_branch = get_current_branch(repo_root)
-    data["git_commit"] = current_commit
-    data["git_branch"] = current_branch
-    mgr.save()
+    mgr.set_git_state(current_commit, current_branch)
 
     return RefreshResult(
         new=len(diff.new_files),
@@ -567,5 +545,3 @@ def refresh_progress_from_git(
         transitively_invalidated=invalidated_count,
         pruned=0,
     )
-
-

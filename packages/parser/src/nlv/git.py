@@ -14,6 +14,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_TIMEOUT_SECONDS = 30
+
 
 def is_git_repo(path: Path) -> bool:
     """Check whether *path* is inside a git working tree.
@@ -31,9 +33,10 @@ def is_git_repo(path: Path) -> bool:
             capture_output=True,
             text=True,
             check=False,
+            timeout=_TIMEOUT_SECONDS,
         )
         return result.returncode == 0 and result.stdout.strip() == "true"
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
@@ -53,6 +56,7 @@ def get_head_commit(repo_root: Path) -> str | None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=_TIMEOUT_SECONDS,
         )
         if result.returncode != 0:
             return None
@@ -60,7 +64,7 @@ def get_head_commit(repo_root: Path) -> str | None:
         if len(commit) == 40:
             return commit
         return None
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError, subprocess.TimeoutExpired):
         return None
 
 
@@ -80,12 +84,13 @@ def get_current_branch(repo_root: Path) -> str | None:
             capture_output=True,
             text=True,
             check=False,
+            timeout=_TIMEOUT_SECONDS,
         )
         if result.returncode != 0:
             return None
         branch = result.stdout.strip()
         return branch if branch else None
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError, subprocess.TimeoutExpired):
         return None
 
 
@@ -99,6 +104,8 @@ def commit_exists(repo_root: Path, commit_hash: str) -> bool:
     Returns:
         True if the commit exists and is a valid commit object.
     """
+    if not commit_hash or commit_hash.startswith("-"):
+        return False
     try:
         result = subprocess.run(
             ["git", "cat-file", "-t", commit_hash],
@@ -106,12 +113,13 @@ def commit_exists(repo_root: Path, commit_hash: str) -> bool:
             capture_output=True,
             text=True,
             check=False,
+            timeout=_TIMEOUT_SECONDS,
         )
         return (
             result.returncode == 0
             and result.stdout.strip() == "commit"
         )
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
@@ -123,7 +131,8 @@ def diff_name_status(
     """Run ``git diff --name-status`` between two commits.
 
     Each entry is a tuple of ``(status, path)`` for simple statuses
-    (A, M, D) or ``(status, old_path, new_path)`` for renames (R).
+    (A, M, D). Renames are disabled (``--no-renames``) so they appear
+    as separate D + A entries.
 
     Args:
         repo_root: Path inside the git repository.
@@ -138,13 +147,14 @@ def diff_name_status(
         result = subprocess.run(
             [
                 "git", "diff", "--name-status",
-                "--no-renames",  # Simplify: treat renames as D+A
+                "--no-renames",
                 f"{from_commit}..{to_commit}",
             ],
             cwd=repo_root,
             capture_output=True,
             text=True,
             check=False,
+            timeout=_TIMEOUT_SECONDS,
         )
         if result.returncode != 0:
             logger.debug(
@@ -159,5 +169,5 @@ def diff_name_status(
             if len(parts) >= 2:
                 entries.append(tuple(parts))
         return entries
-    except (OSError, FileNotFoundError):
+    except (OSError, FileNotFoundError, subprocess.TimeoutExpired):
         return None
