@@ -237,6 +237,8 @@ export function createStandaloneMcpServer(
       if (ipcClient.isConnected()) {
         const result = await ipcClient.callTool(tool, args);
         if (result) return result;
+        // Connected but call failed (timeout, socket error)
+        return callFailedError(tool);
       }
     }
     return disconnectedError(tool);
@@ -761,6 +763,22 @@ function disconnectedError(tool: string) {
       {
         type: "text" as const,
         text: `VS Code extension not connected — ${tool} had no visual effect. Ensure the No Longer Vibe extension is active in VS Code.`,
+      },
+    ],
+  };
+}
+
+/**
+ * Returns an MCP error response when the extension is connected but
+ * a tool call failed (timeout, socket error, etc.).
+ */
+function callFailedError(tool: string) {
+  return {
+    isError: true as const,
+    content: [
+      {
+        type: "text" as const,
+        text: `VS Code extension is connected but ${tool} call failed. The extension may have encountered an error.`,
       },
     ],
   };
