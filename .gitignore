@@ -51,3 +51,6 @@ packages/extension/dist/
 
 # Claude Code (keep settings.local.json for harness, ignore logs)
 .claude/logs/
+
+# Docs + Extras
+demo-video/
