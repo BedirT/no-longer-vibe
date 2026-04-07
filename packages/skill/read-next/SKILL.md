@@ -70,6 +70,11 @@ When the No Longer Vibe VS Code extension is installed and connected,
 additional visual MCP tools are available. Use them conditionally —
 **always check if a tool is available before calling it**.
 
+If a visual tool returns `isError: true` with "not connected", the
+VS Code extension is not available. Fallback: skip visual MCP calls
+and continue with text-only briefings. The reading session works
+fully without MCP — visual tools are an enhancement, not a requirement.
+
 ### MCP-Enhanced Flow
 
 When visual MCP tools are available:

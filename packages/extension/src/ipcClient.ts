@@ -29,6 +29,7 @@ export class IpcBridgeClient {
   private socket: net.Socket | undefined;
   private connected = false;
   private readonly socketPath: string;
+  private readonly reconnectCooldown: number;
   private nextId = 1;
   private pending = new Map<
     number,
@@ -39,8 +40,9 @@ export class IpcBridgeClient {
   >();
   private buffer = "";
 
-  constructor(socketPath: string) {
+  constructor(socketPath: string, reconnectCooldown = 5000) {
     this.socketPath = socketPath;
+    this.reconnectCooldown = reconnectCooldown;
   }
 
   /**
@@ -75,6 +77,31 @@ export class IpcBridgeClient {
   /** Whether the client is currently connected to the extension. */
   isConnected(): boolean {
     return this.connected;
+  }
+
+  /** Timestamp of the last failed reconnection attempt. */
+  private lastReconnectAttempt = 0;
+
+  /**
+   * Attempts to reconnect if currently disconnected.
+   * Returns true if already connected or reconnection succeeded.
+   * Skips reconnection if a recent attempt failed (cooldown period).
+   */
+  async tryReconnect(): Promise<boolean> {
+    if (this.connected) {
+      return true;
+    }
+    const now = Date.now();
+    if (now - this.lastReconnectAttempt < this.reconnectCooldown) {
+      return false;
+    }
+    this.lastReconnectAttempt = now;
+    // Clean up stale socket before attempting reconnection
+    if (this.socket) {
+      this.socket.destroy();
+      this.socket = undefined;
+    }
+    return this.connect();
   }
 
   /**
