@@ -97,7 +97,7 @@ class TypeScriptPlugin:
 
         return ParseResult(
             imports=tuple(sorted(imports, key=lambda r: r.source)),
-            exports=tuple(sorted(exports, key=lambda e: (e.name, e.line))),
+            exports=tuple(sorted(exports, key=lambda e: (e.line, e.name))),
             functions=tuple(sorted(functions, key=lambda f: (f.line, f.name))),
             entry_point=entry_point,
         )
