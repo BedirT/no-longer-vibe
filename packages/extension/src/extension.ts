@@ -183,9 +183,8 @@ export async function activate(
     context.subscriptions.push(progressTreeView);
     context.subscriptions.push({ dispose: () => progressTree.dispose() });
 
-    // Auto-reveal opened files in the progress tree
-    const revealSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (!editor) return;
+    // Reveal a file in the progress tree sidebar
+    const revealFileInTree = (editor: vscode.TextEditor) => {
       const filePath = editor.document.uri.fsPath;
       if (!filePath.startsWith(workspaceRoot)) return;
       const relativePath = filePath.slice(workspaceRoot.length + 1);
@@ -193,10 +192,24 @@ export async function activate(
       if (item) {
         progressTreeView.reveal(item, { select: true, focus: false, expand: true }).then(
           undefined,
-          () => { /* ignore reveal errors (e.g. tree not visible) */ },
+          () => { /* tree not visible or item not found */ },
         );
       }
+    };
+
+    // Auto-reveal on tab switch
+    const revealSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) revealFileInTree(editor);
     });
+
+    // Also reveal the currently active editor on startup
+    if (vscode.window.activeTextEditor) {
+      setTimeout(() => {
+        if (vscode.window.activeTextEditor) {
+          revealFileInTree(vscode.window.activeTextEditor);
+        }
+      }, 500);
+    }
     context.subscriptions.push(revealSub);
 
     if (mapData) {
