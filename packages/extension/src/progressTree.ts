@@ -81,63 +81,12 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   }
 
   /**
-   * Ensures a file tree item exists in the cache by force-building
-   * its ancestor chain (layer → directories → file). This is needed
-   * because items only enter the cache when getChildren() is called,
-   * which normally only happens when the user expands a node.
-   *
-   * Returns the file item, or undefined if the file is not in the map.
+   * Returns a file tree item from the eagerly-populated cache.
    */
   ensureFileItem(relativePath: string): vscode.TreeItem | undefined {
-    // Fast path: already cached
-    const cached = this.itemsById.get(`file:${relativePath}`);
-    if (cached) return cached;
-
-    if (!this.mapData) return undefined;
-
-    // Find which layer this file belongs to
-    let layerName: LayerName | undefined;
-    for (const [name, layer] of Object.entries(this.mapData.layers)) {
-      if (layer.files.includes(relativePath)) {
-        layerName = name as LayerName;
-        break;
-      }
-    }
-    if (!layerName) return undefined;
-
-    // Ensure root items exist (layer items)
-    if (this.itemsById.size === 0) {
-      this.getChildren(undefined);
-    }
-
-    // Get the layer item and force-expand it
-    const layerItem = this.itemsById.get(`layer:${layerName}`);
-    if (!layerItem) return undefined;
-
-    // Walk down the directory path, calling getChildren at each level
-    // to populate the cache
-    const parts = relativePath.split("/");
-    let currentItem: vscode.TreeItem = layerItem;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      const children = this.getChildren(currentItem);
-      // Find the directory child that contains our target file
-      const nextDir = children.find((child) => {
-        const ctx = child.contextValue ?? "";
-        if (!ctx.startsWith("dir:")) return false;
-        // The dir path is after "dir:<layer>:"
-        const dirPath = ctx.slice(`dir:${layerName}:`.length);
-        return relativePath.startsWith(dirPath + "/");
-      });
-      if (!nextDir) break;
-      currentItem = nextDir;
-    }
-
-    // One final getChildren to populate file-level items
-    this.getChildren(currentItem);
-
     return this.itemsById.get(`file:${relativePath}`);
   }
+
 
   /**
    * Returns child elements for the given tree item.
@@ -292,9 +241,13 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
   /**
    * Builds root-level tree items for each non-empty layer.
+   *
+   * Also eagerly builds ALL directory and file items into the cache
+   * so that ensureFileItem/getItemById always work, even if the user
+   * hasn't expanded any tree nodes.
    */
   private buildLayerItems(): vscode.TreeItem[] {
-    // Clear parent tracking caches — buildLayerItems is the root call
+    // Clear caches — this is the root call that rebuilds everything
     this.itemsById.clear();
     this.parentIdMap.clear();
 
@@ -317,9 +270,36 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
 
       this.itemsById.set(item.id, item);
       items.push(item);
+
+      // Eagerly build all children so the cache is always complete.
+      // This calls buildDirChildren recursively, which creates the
+      // REAL items (same objects VS Code gets from getChildren) and
+      // populates itemsById/parentIdMap as a side effect.
+      this.populateCacheRecursive(layerName, "");
     }
 
     return items;
+  }
+
+  /**
+   * Recursively calls buildDirChildren to populate the full cache
+   * for a layer. The items built here are the same objects that
+   * getChildren() returns, so reveal() works correctly.
+   */
+  private populateCacheRecursive(
+    layerName: LayerName,
+    dirPrefix: string,
+  ): void {
+    const children = this.buildDirChildren(layerName, dirPrefix);
+    for (const child of children) {
+      const ctx = child.contextValue ?? "";
+      if (ctx.startsWith("dir:")) {
+        const rest = ctx.slice("dir:".length);
+        const sepIdx = rest.indexOf(":");
+        const childDirPath = rest.slice(sepIdx + 1);
+        this.populateCacheRecursive(layerName, childDirPath);
+      }
+    }
   }
 
   /**
