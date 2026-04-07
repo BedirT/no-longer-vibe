@@ -476,8 +476,11 @@ export const window = {
     },
   ),
   createTreeView: vi.fn(
-    (_viewId: string, _options: unknown): { dispose: () => void } => {
-      return { dispose: () => {} };
+    (_viewId: string, _options: unknown): { dispose: () => void; reveal: (...args: unknown[]) => Promise<void> } => {
+      return {
+        dispose: () => {},
+        reveal: vi.fn(async () => {}),
+      };
     },
   ),
   createTextEditorDecorationType: vi.fn(

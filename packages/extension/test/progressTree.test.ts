@@ -98,6 +98,27 @@ function makeMap(overrides?: Partial<CodebaseMap>): CodebaseMap {
   };
 }
 
+/**
+ * Helper: given a layer item, drill through the directory level to get file items.
+ * For the default makeMap, each layer has one directory containing one file.
+ */
+function getFilesFromLayer(
+  provider: ProgressTreeProvider,
+  layerItem: { contextValue?: string },
+): ReturnType<ProgressTreeProvider["getChildren"]> {
+  const dirs = provider.getChildren(layerItem as Parameters<ProgressTreeProvider["getChildren"]>[0]);
+  // dirs may contain directory items (contextValue starts with "dir:") or direct file items
+  const files: ReturnType<ProgressTreeProvider["getChildren"]> = [];
+  for (const d of dirs) {
+    if (d.contextValue?.startsWith("dir:")) {
+      files.push(...provider.getChildren(d));
+    } else {
+      files.push(d);
+    }
+  }
+  return files;
+}
+
 describe("ProgressTreeProvider", () => {
   let provider: ProgressTreeProvider;
 
@@ -231,14 +252,173 @@ describe("ProgressTreeProvider", () => {
     });
   });
 
-  describe("getChildren — file level", () => {
-    it("returns file items for a given layer", () => {
+  describe("getChildren — directory level", () => {
+    it("returns directory items for a given layer", () => {
       provider.updateMapData(makeMap());
       const layers = provider.getChildren();
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const dirs = provider.getChildren(foundationLayer);
+
+      // foundation has src/config.ts -> directory "src"
+      expect(dirs).toHaveLength(1);
+      expect(dirs[0].contextValue).toBe("dir:foundation:src");
+    });
+
+    it("collapses single-child directory chains", () => {
+      provider.updateMapData(makeMap());
+      const layers = provider.getChildren();
+      const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
+      const dirs = provider.getChildren(coreLayer);
+
+      // core has src/models/user.ts -> collapsed to "src/models"
+      expect(dirs).toHaveLength(1);
+      expect(dirs[0].contextValue).toBe("dir:core:src/models");
+      expect(dirs[0].label).toBe("src/models");
+    });
+
+    it("does NOT collapse directories that have direct files alongside subdirectories", () => {
+      const map = makeMap({
+        layers: {
+          foundation: {
+            description: "",
+            files: ["src/index.ts", "src/utils/helper.ts"],
+          },
+          core: { description: "", files: [] },
+          features: { description: "", files: [] },
+          integration: { description: "", files: [] },
+          entry: { description: "", files: [] },
+        },
+        reading_order: [
+          {
+            index: 0,
+            path: "src/index.ts",
+            layer: "foundation",
+            reason: "",
+            complexity: "low",
+            line_count: 10,
+            imports: [],
+            imported_by: [],
+            exports: [],
+          },
+          {
+            index: 1,
+            path: "src/utils/helper.ts",
+            layer: "foundation",
+            reason: "",
+            complexity: "low",
+            line_count: 10,
+            imports: [],
+            imported_by: [],
+            exports: [],
+          },
+        ],
+      });
+      provider.updateMapData(map);
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const dirs = provider.getChildren(foundationLayer);
+
+      // "src" should NOT be collapsed because it has both a direct file (index.ts)
+      // and a subdirectory (utils)
+      expect(dirs).toHaveLength(1);
+      expect(dirs[0].contextValue).toBe("dir:foundation:src");
+      expect(dirs[0].label).toBe("src");
+
+      // Inside "src", we should see the subdirectory "utils" and the file "index.ts"
+      const srcChildren = provider.getChildren(dirs[0]);
+      const dirChildren = srcChildren.filter((c) =>
+        c.contextValue?.startsWith("dir:"),
+      );
+      const fileChildren = srcChildren.filter((c) =>
+        c.contextValue?.startsWith("file:"),
+      );
+      expect(dirChildren).toHaveLength(1);
+      expect(dirChildren[0].contextValue).toBe("dir:foundation:src/utils");
+      expect(fileChildren).toHaveLength(1);
+      expect(fileChildren[0].contextValue).toBe("file:src/index.ts");
+    });
+
+    it("directory items have folder icons", () => {
+      provider.updateMapData(makeMap());
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const dirs = provider.getChildren(foundationLayer);
+
+      expect(dirs[0].iconPath).toBeDefined();
+      expect((dirs[0].iconPath as { id: string }).id).toBe("folder");
+    });
+
+    it("multiple files in the same directory appear as siblings", () => {
+      const map = makeMap({
+        layers: {
+          foundation: {
+            description: "",
+            files: ["src/config.ts", "src/constants.ts"],
+          },
+          core: { description: "", files: [] },
+          features: { description: "", files: [] },
+          integration: { description: "", files: [] },
+          entry: { description: "", files: [] },
+        },
+        reading_order: [
+          {
+            index: 0,
+            path: "src/config.ts",
+            layer: "foundation",
+            reason: "",
+            complexity: "low",
+            line_count: 10,
+            imports: [],
+            imported_by: [],
+            exports: ["AppConfig"],
+          },
+          {
+            index: 1,
+            path: "src/constants.ts",
+            layer: "foundation",
+            reason: "",
+            complexity: "low",
+            line_count: 10,
+            imports: [],
+            imported_by: [],
+            exports: [],
+          },
+        ],
+      });
+      provider.updateMapData(map);
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const dirs = provider.getChildren(foundationLayer);
+
+      // Single "src" directory
+      expect(dirs).toHaveLength(1);
+      expect(dirs[0].contextValue).toBe("dir:foundation:src");
+
+      // Inside "src", both files appear as siblings
+      const files = provider.getChildren(dirs[0]);
+      expect(files).toHaveLength(2);
+      const labels = files.map((f) => f.label);
+      expect(labels).toContain("config.ts");
+      expect(labels).toContain("constants.ts");
+    });
+  });
+
+  describe("getChildren — file level", () => {
+    it("returns file items for a given layer (through directories)", () => {
+      provider.updateMapData(makeMap());
+      const layers = provider.getChildren();
+      const foundationLayer = layers.find(
+        (l) => l.contextValue === "layer:foundation",
+      )!;
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       expect(files).toHaveLength(1);
       expect(files[0].label).toBe("config.ts");
@@ -248,7 +428,7 @@ describe("ProgressTreeProvider", () => {
       provider.updateMapData(makeMap());
       const layers = provider.getChildren();
       const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
-      const files = provider.getChildren(coreLayer);
+      const files = getFilesFromLayer(provider, coreLayer);
 
       expect(files[0].label).toBe("user.ts");
     });
@@ -259,7 +439,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       expect(files[0].contextValue).toBe("file:src/config.ts");
     });
@@ -270,7 +450,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       // src/config.ts has exports ["AppConfig", "getConfig"]
       expect(files[0].collapsibleState).toBeGreaterThan(0);
@@ -285,7 +465,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       expect(files[0].collapsibleState).toBe(0);
     });
@@ -296,21 +476,26 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       expect(files[0].command).toBeDefined();
       expect(files[0].command!.command).toBe("vscode.open");
       expect(files[0].command!.title).toBe("Open File");
     });
 
-    it("file description shows directory path for nested files", () => {
+    it("file directory context is provided by parent directory node", () => {
       provider.updateMapData(makeMap());
       const layers = provider.getChildren();
       const coreLayer = layers.find((l) => l.contextValue === "layer:core")!;
-      const files = provider.getChildren(coreLayer);
+      const dirs = provider.getChildren(coreLayer);
 
-      // src/models/user.ts -> description should show "src/models"
-      expect(files[0].description).toBe("src/models");
+      // The directory node provides the path context (src/models)
+      expect(dirs[0].contextValue).toBe("dir:core:src/models");
+      expect(dirs[0].label).toBe("src/models");
+
+      // The file itself just shows the basename
+      const files = provider.getChildren(dirs[0]);
+      expect(files[0].label).toBe("user.ts");
     });
   });
 
@@ -321,7 +506,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const configFile = files[0];
       const exports = provider.getChildren(configFile);
 
@@ -337,7 +522,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const exports = provider.getChildren(files[0]);
 
       for (const exp of exports) {
@@ -351,11 +536,11 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const exports = provider.getChildren(files[0]);
 
-      expect(exports[0].contextValue).toBe("export:AppConfig");
-      expect(exports[1].contextValue).toBe("export:getConfig");
+      expect(exports[0].contextValue).toBe("export:src/config.ts:AppConfig");
+      expect(exports[1].contextValue).toBe("export:src/config.ts:getConfig");
     });
 
     it("returns empty array for files with no exports", () => {
@@ -367,7 +552,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const exports = provider.getChildren(files[0]);
 
       expect(exports).toEqual([]);
@@ -381,7 +566,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       expect(files[0].iconPath).toBeDefined();
       // ThemeIcon is mocked; check the id
@@ -395,7 +580,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       const icon = files[0].iconPath as { id: string; color?: { id: string } };
       expect(icon.id).toBe("check");
@@ -409,7 +594,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       const icon = files[0].iconPath as { id: string; color?: { id: string } };
       expect(icon.id).toBe("warning");
@@ -423,7 +608,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       const icon = files[0].iconPath as { id: string; color?: { id: string } };
       expect(icon.id).toBe("eye-closed");
@@ -437,7 +622,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       const icon = files[0].iconPath as { id: string; color?: { id: string } };
       expect(icon.id).toBe("eye");
@@ -452,7 +637,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
 
       const icon = files[0].iconPath as { id: string; color?: { id: string } };
       expect(icon.id).toBe("eye");
@@ -587,7 +772,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const icon = files[0].iconPath as { id: string };
       expect(icon.id).toBe("check");
     });
@@ -607,7 +792,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const icon = files[0].iconPath as { id: string };
       expect(icon.id).toBe("warning");
     });
@@ -627,7 +812,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const icon = files[0].iconPath as { id: string };
       expect(icon.id).toBe("eye");
     });
@@ -751,7 +936,7 @@ describe("ProgressTreeProvider", () => {
       const foundationLayer = layers.find(
         (l) => l.contextValue === "layer:foundation",
       )!;
-      const files = provider.getChildren(foundationLayer);
+      const files = getFilesFromLayer(provider, foundationLayer);
       const icon = files[0].iconPath as { id: string };
       // Current takes priority
       expect(icon.id).toBe("eye");

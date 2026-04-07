@@ -7,6 +7,7 @@ import {
   dispose as disposeProgress,
   loadProgressData,
   onProgressDataChanged,
+  updateExportStatus,
   updateFileStatus,
   watchProgressJson,
 } from "./progressData";
@@ -176,10 +177,40 @@ export async function activate(
 
     // Register progress tree sidebar view
     const progressTree = new ProgressTreeProvider(workspaceRoot);
-    context.subscriptions.push(
-      vscode.window.registerTreeDataProvider("nlv.progressTree", progressTree),
-    );
+    const progressTreeView = vscode.window.createTreeView("nlv.progressTree", {
+      treeDataProvider: progressTree,
+    });
+    context.subscriptions.push(progressTreeView);
     context.subscriptions.push({ dispose: () => progressTree.dispose() });
+
+    // Reveal a file in the progress tree sidebar
+    const revealFileInTree = (editor: vscode.TextEditor) => {
+      const filePath = editor.document.uri.fsPath;
+      if (!filePath.startsWith(workspaceRoot)) return;
+      const relativePath = filePath.slice(workspaceRoot.length + 1);
+      const item = progressTree.ensureFileItem(relativePath);
+      if (item) {
+        progressTreeView.reveal(item, { select: true, focus: false, expand: true }).then(
+          undefined,
+          () => { /* tree not visible or item not found */ },
+        );
+      }
+    };
+
+    // Auto-reveal on tab switch
+    const revealSub = vscode.window.onDidChangeActiveTextEditor((editor) => {
+      if (editor) revealFileInTree(editor);
+    });
+
+    // Also reveal the currently active editor on startup
+    if (vscode.window.activeTextEditor) {
+      setTimeout(() => {
+        if (vscode.window.activeTextEditor) {
+          revealFileInTree(vscode.window.activeTextEditor);
+        }
+      }, 500);
+    }
+    context.subscriptions.push(revealSub);
 
     if (mapData) {
       progressTree.updateMapData(mapData);
@@ -210,6 +241,25 @@ export async function activate(
       );
       context.subscriptions.push(disposable);
     }
+
+    // Register export marking command (right-click on export node)
+    const markExportCmd = vscode.commands.registerCommand(
+      "nlv.markExportRead",
+      async (item?: vscode.TreeItem) => {
+        const ctx = item?.contextValue ?? "";
+        if (!ctx.startsWith("export:")) return;
+        // contextValue format: "export:<filePath>:<exportName>"
+        const rest = ctx.slice("export:".length);
+        const lastColon = rest.lastIndexOf(":");
+        if (lastColon === -1) return;
+        const filePath = rest.slice(0, lastColon);
+        const exportName = rest.slice(lastColon + 1);
+        await updateExportStatus(filePath, exportName);
+        // Clear any agent highlights on this file
+        highlightManager.clearHighlightsForFile(filePath);
+      },
+    );
+    context.subscriptions.push(markExportCmd);
 
     // Populate initial progress state from progress.json
     if (progressData) {

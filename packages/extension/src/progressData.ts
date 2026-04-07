@@ -7,6 +7,7 @@ export interface ProgressFileEntry {
   read_at: string;
   note?: string | null;
   summary?: string | null;
+  exports_read?: Record<string, { read_at: string; summary?: string | null }>;
 }
 
 /** Stats summary from progress.json. */
@@ -208,6 +209,51 @@ export async function updateFileStatus(
     const content = JSON.stringify(currentProgress, null, 2) + "\n";
     await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
     log(`Updated ${relativePath} to ${status}`);
+    return true;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log(`Failed to write progress.json: ${message}`);
+    return false;
+  }
+}
+
+/**
+ * Marks a single export as read within a file's progress entry.
+ * Creates the file entry and exports_read map if they don't exist.
+ * The FileSystemWatcher will detect the change and reload automatically.
+ */
+export async function updateExportStatus(
+  relativePath: string,
+  exportName: string,
+): Promise<boolean> {
+  const uri = getProgressJsonUri();
+  if (!uri || !currentProgress) {
+    log("Cannot update export status: no progress.json loaded");
+    return false;
+  }
+
+  if (!currentProgress.files[relativePath]) {
+    currentProgress.files[relativePath] = {
+      status: "unread",
+      read_at: "",
+      note: null,
+      summary: null,
+    };
+  }
+
+  const fileEntry = currentProgress.files[relativePath];
+  if (!fileEntry.exports_read) {
+    fileEntry.exports_read = {};
+  }
+  fileEntry.exports_read[exportName] = {
+    read_at: new Date().toISOString(),
+    summary: null,
+  };
+
+  try {
+    const content = JSON.stringify(currentProgress, null, 2) + "\n";
+    await vscode.workspace.fs.writeFile(uri, Buffer.from(content, "utf-8"));
+    log(`Marked export ${exportName} in ${relativePath} as read`);
     return true;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

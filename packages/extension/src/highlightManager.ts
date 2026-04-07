@@ -97,6 +97,9 @@ export class HighlightManager {
   /** Event subscription disposable. */
   private readonly eventSubscription: vscode.Disposable;
 
+  /** Editor change subscription for reapplying decorations on tab switch. */
+  private readonly editorChangeSubscription: vscode.Disposable;
+
   /** Whether this manager has been disposed. */
   private disposed = false;
 
@@ -140,6 +143,23 @@ export class HighlightManager {
       }
       this.handleToolEvent(event);
     });
+
+    // Reapply highlights when switching back to a file
+    this.editorChangeSubscription = vscode.window.onDidChangeActiveTextEditor(
+      (editor) => {
+        if (this.disposed || !editor) {
+          return;
+        }
+        // Check all tracked files for a match
+        for (const filePath of this.activeHighlights.keys()) {
+          const editorPath = editor.document.uri.fsPath;
+          if (editorPath === filePath || editorPath.endsWith(`/${filePath}`)) {
+            this.applyDecorationsForFile(filePath);
+            break;
+          }
+        }
+      },
+    );
   }
 
   /**
@@ -159,6 +179,7 @@ export class HighlightManager {
   dispose(): void {
     this.disposed = true;
     this.eventSubscription.dispose();
+    this.editorChangeSubscription.dispose();
 
     for (const decorationType of this.decorationTypes.values()) {
       decorationType.dispose();
@@ -203,6 +224,12 @@ export class HighlightManager {
 
     // Apply decorations to visible editors
     this.applyDecorationsForFile(file);
+  }
+
+  /** Clears highlights for a specific file. Public API for use by commands. */
+  clearHighlightsForFile(filePath: string): void {
+    this.activeHighlights.delete(filePath);
+    this.clearDecorationsForFile(filePath);
   }
 
   /** Handles the clear_highlights tool event. */

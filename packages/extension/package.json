@@ -53,6 +53,11 @@
         "command": "nlv.markSkimmed",
         "title": "Mark as Skimmed",
         "icon": "$(eye-closed)"
+      },
+      {
+        "command": "nlv.markExportRead",
+        "title": "Mark as Read",
+        "icon": "$(check)"
       }
     ],
     "menus": {
@@ -71,6 +76,11 @@
           "command": "nlv.markSkimmed",
           "when": "viewItem =~ /^file:/",
           "group": "nlv@3"
+        },
+        {
+          "command": "nlv.markExportRead",
+          "when": "viewItem =~ /^export:/",
+          "group": "nlv@1"
         }
       ],
       "view/title": [],
@@ -85,6 +95,10 @@
         },
         {
           "command": "nlv.markSkimmed",
+          "when": "false"
+        },
+        {
+          "command": "nlv.markExportRead",
           "when": "false"
         }
       ]
