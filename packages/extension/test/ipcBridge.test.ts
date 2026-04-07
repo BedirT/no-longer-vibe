@@ -126,13 +126,37 @@ describe("IPC Bridge", () => {
       expect(client.isConnected()).toBe(false);
     });
 
-    it("tryReconnect recovers after server restart", async () => {
+    it("tryReconnect respects cooldown between attempts", async () => {
+      // Use a long cooldown (10s) so second attempt is throttled
+      const client = new IpcBridgeClient(socketPath, 10000);
+
+      // First attempt fails
+      const result1 = await client.tryReconnect();
+      expect(result1).toBe(false);
+
+      // Start server
       const server = new IpcBridgeServer(socketPath, async () => ({
         content: [{ type: "text", text: "ok" }],
       }));
       await server.start();
 
-      const client = new IpcBridgeClient(socketPath);
+      // Second attempt is within cooldown — should be skipped
+      const result2 = await client.tryReconnect();
+      expect(result2).toBe(false);
+      expect(client.isConnected()).toBe(false);
+
+      client.disconnect();
+      await server.stop();
+    });
+
+    it("tryReconnect recovers after server restart", async () => {
+      // Zero cooldown so reconnect is immediate after server restart
+      const server = new IpcBridgeServer(socketPath, async () => ({
+        content: [{ type: "text", text: "ok" }],
+      }));
+      await server.start();
+
+      const client = new IpcBridgeClient(socketPath, 0);
       await client.connect();
       expect(client.isConnected()).toBe(true);
 

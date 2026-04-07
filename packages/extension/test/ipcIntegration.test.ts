@@ -251,8 +251,8 @@ describe("MCP bridge integration", () => {
 
   describe("lazy reconnection", () => {
     it("visual tools reconnect when server becomes available after initial failure", async () => {
-      // Start with disconnected client (no server yet)
-      const client = new IpcBridgeClient(socketPath);
+      // Start with disconnected client (no server yet); zero cooldown for test speed
+      const client = new IpcBridgeClient(socketPath, 0);
       const mcpServer = createStandaloneMcpServer(tmpDir, client);
 
       // First call fails (no server)
@@ -293,7 +293,7 @@ describe("MCP bridge integration", () => {
     });
 
     it("open_file reconnects when server becomes available", async () => {
-      const client = new IpcBridgeClient(socketPath);
+      const client = new IpcBridgeClient(socketPath, 0);
       const mcpServer = createStandaloneMcpServer(tmpDir, client);
 
       // First call fails

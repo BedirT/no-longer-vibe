@@ -223,6 +223,25 @@ export function createStandaloneMcpServer(
     },
   );
 
+  /**
+   * Forwards a visual tool call to the extension via IPC with lazy
+   * reconnection. Returns the extension's result on success, or an
+   * isError response when the extension is not connected.
+   */
+  async function forwardVisualTool(
+    tool: string,
+    args: Record<string, unknown>,
+  ) {
+    if (ipcClient) {
+      await ipcClient.tryReconnect();
+      if (ipcClient.isConnected()) {
+        const result = await ipcClient.callTool(tool, args);
+        if (result) return result;
+      }
+    }
+    return disconnectedError(tool);
+  }
+
   // --- Tools that work standalone ---
 
   server.tool(
@@ -237,16 +256,7 @@ export function createStandaloneMcpServer(
         .optional()
         .describe("Line number to scroll to"),
     },
-    async (args) => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("open_file", args);
-          if (result) return result;
-        }
-      }
-      return disconnectedError("open_file");
-    },
+    async (args) => forwardVisualTool("open_file", args),
   );
 
   server.tool(
@@ -678,16 +688,7 @@ export function createStandaloneMcpServer(
         .optional()
         .describe("Importance weight (0.0-1.0). When provided with 'focus' style, renders opacity-tiered highlighting."),
     },
-    async (args) => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("highlight_range", args);
-          if (result) return result;
-        }
-      }
-      return disconnectedError("highlight_range");
-    },
+    async (args) => forwardVisualTool("highlight_range", args),
   );
 
   server.tool(
@@ -699,16 +700,7 @@ export function createStandaloneMcpServer(
         .optional()
         .describe("File path to clear, or omit to clear all"),
     },
-    async (args) => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("clear_highlights", args);
-          if (result) return result;
-        }
-      }
-      return disconnectedError("clear_highlights");
-    },
+    async (args) => forwardVisualTool("clear_highlights", args),
   );
 
   server.tool(
@@ -729,48 +721,21 @@ export function createStandaloneMcpServer(
         )
         .describe("CodeLens entries to display"),
     },
-    async (args) => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("set_codelens", args);
-          if (result) return result;
-        }
-      }
-      return disconnectedError("set_codelens");
-    },
+    async (args) => forwardVisualTool("set_codelens", args),
   );
 
   server.tool(
     "clear_blast_radius",
     "Clear the blast radius visualization",
     {},
-    async () => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("clear_blast_radius", {});
-          if (result) return result;
-        }
-      }
-      return disconnectedError("clear_blast_radius");
-    },
+    async () => forwardVisualTool("clear_blast_radius", {}),
   );
 
   server.tool(
     "clear_all",
     "Reset all decorations, highlights, and visual state",
     {},
-    async () => {
-      if (ipcClient) {
-        await ipcClient.tryReconnect();
-        if (ipcClient.isConnected()) {
-          const result = await ipcClient.callTool("clear_all", {});
-          if (result) return result;
-        }
-      }
-      return disconnectedError("clear_all");
-    },
+    async () => forwardVisualTool("clear_all", {}),
   );
 
   return { server };
