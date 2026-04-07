@@ -81,6 +81,65 @@ export class ProgressTreeProvider implements vscode.TreeDataProvider<vscode.Tree
   }
 
   /**
+   * Ensures a file tree item exists in the cache by force-building
+   * its ancestor chain (layer → directories → file). This is needed
+   * because items only enter the cache when getChildren() is called,
+   * which normally only happens when the user expands a node.
+   *
+   * Returns the file item, or undefined if the file is not in the map.
+   */
+  ensureFileItem(relativePath: string): vscode.TreeItem | undefined {
+    // Fast path: already cached
+    const cached = this.itemsById.get(`file:${relativePath}`);
+    if (cached) return cached;
+
+    if (!this.mapData) return undefined;
+
+    // Find which layer this file belongs to
+    let layerName: LayerName | undefined;
+    for (const [name, layer] of Object.entries(this.mapData.layers)) {
+      if (layer.files.includes(relativePath)) {
+        layerName = name as LayerName;
+        break;
+      }
+    }
+    if (!layerName) return undefined;
+
+    // Ensure root items exist (layer items)
+    if (this.itemsById.size === 0) {
+      this.getChildren(undefined);
+    }
+
+    // Get the layer item and force-expand it
+    const layerItem = this.itemsById.get(`layer:${layerName}`);
+    if (!layerItem) return undefined;
+
+    // Walk down the directory path, calling getChildren at each level
+    // to populate the cache
+    const parts = relativePath.split("/");
+    let currentItem: vscode.TreeItem = layerItem;
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      const children = this.getChildren(currentItem);
+      // Find the directory child that contains our target file
+      const nextDir = children.find((child) => {
+        const ctx = child.contextValue ?? "";
+        if (!ctx.startsWith("dir:")) return false;
+        // The dir path is after "dir:<layer>:"
+        const dirPath = ctx.slice(`dir:${layerName}:`.length);
+        return relativePath.startsWith(dirPath + "/");
+      });
+      if (!nextDir) break;
+      currentItem = nextDir;
+    }
+
+    // One final getChildren to populate file-level items
+    this.getChildren(currentItem);
+
+    return this.itemsById.get(`file:${relativePath}`);
+  }
+
+  /**
    * Returns child elements for the given tree item.
    * - No parent: returns layer items (root level)
    * - Layer item: returns directory/file items at the layer root
