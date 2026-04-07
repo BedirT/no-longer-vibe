@@ -248,13 +248,13 @@ class ProgressManager:
             reading_order_paths: File paths in reading-order sequence.
         """
         data = self._get_data()
-        files = data.get("files", {})
-        start = data.get("next_unread_index", 0)
+        files: dict[str, dict[str, Any]] = data.get("files", {})
+        start: int = data.get("next_unread_index", 0)
 
         idx = start
         while idx < len(reading_order_paths):
-            path = reading_order_paths[idx]
-            entry = files.get(path)
+            file_path = reading_order_paths[idx]
+            entry = files.get(file_path)
             if entry and entry.get("status") == FileStatus.UNREAD.value:
                 break
             idx += 1
