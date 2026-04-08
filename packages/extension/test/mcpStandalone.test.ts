@@ -301,6 +301,199 @@ describe("mcpStandalone", () => {
     });
   });
 
+  describe("cascade confirmed status to exports", () => {
+    function writeMapWithExports(dir: string): void {
+      const mapJson = {
+        version: "1.0.0",
+        repo_root: dir,
+        generated_at: "2026-04-04T10:00:00Z",
+        content_hashes: {},
+        total_files: 2,
+        layers: {
+          foundation: { description: "base", files: ["src/config.ts"] },
+          core: { description: "core", files: ["src/models/user.ts"] },
+          features: { description: "feat", files: [] },
+          integration: { description: "int", files: [] },
+          entry: { description: "entry", files: [] },
+        },
+        reading_order: [
+          {
+            index: 0,
+            path: "src/config.ts",
+            layer: "foundation",
+            reason: "base",
+            complexity: "low",
+            line_count: 45,
+            imports: [],
+            imported_by: ["src/models/user.ts"],
+            exports: ["AppConfig", "getConfig", "DEFAULT_CONFIG"],
+          },
+          {
+            index: 1,
+            path: "src/models/user.ts",
+            layer: "core",
+            reason: "core",
+            complexity: "medium",
+            line_count: 120,
+            imports: ["src/config.ts"],
+            imported_by: [],
+            exports: ["User", "createUser"],
+          },
+        ],
+        dependency_graph: {
+          "src/config.ts": { imports: [], imported_by: ["src/models/user.ts"] },
+          "src/models/user.ts": { imports: ["src/config.ts"], imported_by: [] },
+        },
+      };
+      fs.writeFileSync(
+        path.join(dir, ".codebase-guide", "map.json"),
+        JSON.stringify(mapJson),
+      );
+    }
+
+    it("mark_read cascades all exports to confirmed when map.json has exports", async () => {
+      writeMapWithExports(tmpDir);
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_read", { path: "src/config.ts" });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      expect(entry.exports_read).toBeDefined();
+      expect(entry.exports_read["AppConfig"]).toBeDefined();
+      expect(entry.exports_read["getConfig"]).toBeDefined();
+      expect(entry.exports_read["DEFAULT_CONFIG"]).toBeDefined();
+      expect(entry.exports_read["AppConfig"].read_at).toBeDefined();
+    });
+
+    it("mark_read does not overwrite existing exports_read entries", async () => {
+      writeMapWithExports(tmpDir);
+
+      // Pre-populate with an existing export read
+      const progressPath = path.join(guideDir, "progress.json");
+      const initial = {
+        version: "1.0.0",
+        files: {
+          "src/config.ts": {
+            status: "unread",
+            read_at: "",
+            exports_read: {
+              AppConfig: {
+                read_at: "2026-04-01T00:00:00Z",
+                summary: "App configuration type",
+              },
+            },
+          },
+        },
+        stats: { total: 2, confirmed: 0, flagged: 0, skimmed: 0, unread: 2 },
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(initial));
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_read", { path: "src/config.ts" });
+
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      // Existing entry preserved
+      expect(entry.exports_read["AppConfig"].read_at).toBe("2026-04-01T00:00:00Z");
+      expect(entry.exports_read["AppConfig"].summary).toBe("App configuration type");
+      // New entries cascaded
+      expect(entry.exports_read["getConfig"]).toBeDefined();
+      expect(entry.exports_read["DEFAULT_CONFIG"]).toBeDefined();
+    });
+
+    it("complete_file with confirmed status cascades exports", async () => {
+      writeMapWithExports(tmpDir);
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "complete_file", {
+        path: "src/config.ts",
+        status: "confirmed",
+        summary: "Config with env overrides",
+      });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      expect(entry.exports_read).toBeDefined();
+      expect(entry.exports_read["AppConfig"]).toBeDefined();
+      expect(entry.exports_read["getConfig"]).toBeDefined();
+      expect(entry.exports_read["DEFAULT_CONFIG"]).toBeDefined();
+    });
+
+    it("complete_file with flagged status does NOT cascade exports", async () => {
+      writeMapWithExports(tmpDir);
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "complete_file", {
+        path: "src/config.ts",
+        status: "flagged",
+        note: "needs review",
+      });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      expect(entry.exports_read).toBeUndefined();
+    });
+
+    it("complete_file with skimmed status does NOT cascade exports", async () => {
+      writeMapWithExports(tmpDir);
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "complete_file", {
+        path: "src/config.ts",
+        status: "skimmed",
+      });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      expect(entry.exports_read).toBeUndefined();
+    });
+
+    it("cascade works gracefully without map.json (no exports cascaded)", async () => {
+      // No map.json written
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_read", { path: "src/config.ts" });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      // No crash, no exports_read since no map data
+      expect(entry.status).toBe("confirmed");
+      expect(entry.exports_read).toBeUndefined();
+    });
+
+    it("cascade does not add exports for files not in reading_order", async () => {
+      writeMapWithExports(tmpDir);
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_read", { path: "src/unknown.ts" });
+
+      const progressPath = path.join(guideDir, "progress.json");
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/unknown.ts"];
+
+      expect(entry.status).toBe("confirmed");
+      expect(entry.exports_read).toBeUndefined();
+    });
+  });
+
   describe("visual tools report disconnection honestly", () => {
     it("highlight_range returns isError when no IPC client", async () => {
       const mod = await import("../src/mcpStandalone");

@@ -4,6 +4,10 @@ vi.mock("vscode", async () => {
   return await import("./__mocks__/vscode");
 });
 
+vi.mock("../src/mapData", () => ({
+  getMapData: vi.fn(() => undefined),
+}));
+
 import {
   getProgressJsonUri,
   loadProgressData,
@@ -13,6 +17,7 @@ import {
   onProgressDataChanged,
   dispose as disposeProgressData,
 } from "../src/progressData";
+import { getMapData } from "../src/mapData";
 import {
   __setWorkspaceFolders,
   __setFileContent,
@@ -277,6 +282,132 @@ describe("progressData", () => {
 
       const data = getProgressData();
       expect(data?.files["src/config.ts"].status).toBe("skimmed");
+    });
+
+    describe("cascade confirmed to exports", () => {
+      const MAP_WITH_EXPORTS = {
+        version: "1.0.0",
+        repo_root: "/mock/workspace",
+        generated_at: "2026-04-04T10:00:00Z",
+        content_hashes: {},
+        total_files: 2,
+        layers: {
+          foundation: { description: "base", files: ["src/config.ts"] },
+          core: { description: "core", files: ["src/models/user.ts"] },
+          features: { description: "feat", files: [] },
+          integration: { description: "int", files: [] },
+          entry: { description: "entry", files: [] },
+        },
+        reading_order: [
+          {
+            index: 0,
+            path: "src/config.ts",
+            layer: "foundation",
+            reason: "base",
+            complexity: "low",
+            line_count: 45,
+            imports: [],
+            imported_by: ["src/models/user.ts"],
+            exports: ["AppConfig", "getConfig"],
+          },
+          {
+            index: 1,
+            path: "src/models/user.ts",
+            layer: "core",
+            reason: "core",
+            complexity: "medium",
+            line_count: 120,
+            imports: ["src/config.ts"],
+            imported_by: [],
+            exports: ["User", "createUser"],
+          },
+        ],
+        dependency_graph: {
+          "src/config.ts": { imports: [], imported_by: ["src/models/user.ts"] },
+          "src/models/user.ts": { imports: ["src/config.ts"], imported_by: [] },
+        },
+      };
+
+      it("cascades exports to confirmed when file is marked confirmed", async () => {
+        vi.mocked(getMapData).mockReturnValue(MAP_WITH_EXPORTS as never);
+
+        const progressUri = getProgressJsonUri()!;
+        __setFileContent(progressUri.path, VALID_PROGRESS);
+        await loadProgressData();
+
+        await updateFileStatus("src/config.ts", "confirmed");
+
+        const data = getProgressData();
+        const entry = data?.files["src/config.ts"];
+        expect(entry?.exports_read).toBeDefined();
+        expect(entry?.exports_read?.["AppConfig"]).toBeDefined();
+        expect(entry?.exports_read?.["getConfig"]).toBeDefined();
+      });
+
+      it("does not overwrite existing exports_read entries", async () => {
+        vi.mocked(getMapData).mockReturnValue(MAP_WITH_EXPORTS as never);
+
+        const progressWithExports = JSON.parse(VALID_PROGRESS);
+        progressWithExports.files["src/config.ts"].exports_read = {
+          AppConfig: { read_at: "2026-04-01T00:00:00Z", summary: "App config type" },
+        };
+        const progressUri = getProgressJsonUri()!;
+        __setFileContent(progressUri.path, JSON.stringify(progressWithExports));
+        await loadProgressData();
+
+        await updateFileStatus("src/config.ts", "confirmed");
+
+        const data = getProgressData();
+        const entry = data?.files["src/config.ts"];
+        // Existing entry preserved
+        expect(entry?.exports_read?.["AppConfig"]?.read_at).toBe("2026-04-01T00:00:00Z");
+        expect(entry?.exports_read?.["AppConfig"]?.summary).toBe("App config type");
+        // New export cascaded
+        expect(entry?.exports_read?.["getConfig"]).toBeDefined();
+      });
+
+      it("does NOT cascade exports when file is marked flagged", async () => {
+        vi.mocked(getMapData).mockReturnValue(MAP_WITH_EXPORTS as never);
+
+        const progressUri = getProgressJsonUri()!;
+        __setFileContent(progressUri.path, VALID_PROGRESS);
+        await loadProgressData();
+
+        await updateFileStatus("src/config.ts", "flagged");
+
+        const data = getProgressData();
+        const entry = data?.files["src/config.ts"];
+        expect(entry?.exports_read).toBeUndefined();
+      });
+
+      it("does NOT cascade exports when file is marked skimmed", async () => {
+        vi.mocked(getMapData).mockReturnValue(MAP_WITH_EXPORTS as never);
+
+        const progressUri = getProgressJsonUri()!;
+        __setFileContent(progressUri.path, VALID_PROGRESS);
+        await loadProgressData();
+
+        await updateFileStatus("src/config.ts", "skimmed");
+
+        const data = getProgressData();
+        const entry = data?.files["src/config.ts"];
+        expect(entry?.exports_read).toBeUndefined();
+      });
+
+      it("handles gracefully when no map data is loaded", async () => {
+        vi.mocked(getMapData).mockReturnValue(undefined);
+
+        const progressUri = getProgressJsonUri()!;
+        __setFileContent(progressUri.path, VALID_PROGRESS);
+        await loadProgressData();
+
+        await updateFileStatus("src/config.ts", "confirmed");
+
+        const data = getProgressData();
+        expect(data?.files["src/config.ts"].status).toBe("confirmed");
+        // No crash, no exports_read added
+        expect(data?.files["src/config.ts"].exports_read).toBeUndefined();
+      });
     });
   });
 });
