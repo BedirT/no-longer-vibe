@@ -122,6 +122,44 @@ describe("mcpStandalone", () => {
     });
   });
 
+  describe("mark_flagged tool preserves exports_read", () => {
+    it("preserves existing exports_read when flagging a file", async () => {
+      const progressPath = path.join(guideDir, "progress.json");
+      const initial = {
+        version: "1.0.0",
+        files: {
+          "src/config.ts": {
+            status: "confirmed",
+            read_at: "2026-04-04T10:00:00Z",
+            exports_read: {
+              AppConfig: {
+                read_at: "2026-04-01T00:00:00Z",
+                summary: "App configuration type",
+              },
+            },
+          },
+        },
+        stats: { total: 2, confirmed: 1, flagged: 0, skimmed: 0, unread: 1 },
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(initial));
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "mark_flagged", {
+        path: "src/config.ts",
+        reason: "needs deeper review",
+      });
+
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      expect(entry.status).toBe("flagged");
+      expect(entry.exports_read).toBeDefined();
+      expect(entry.exports_read["AppConfig"].read_at).toBe("2026-04-01T00:00:00Z");
+      expect(entry.exports_read["AppConfig"].summary).toBe("App configuration type");
+    });
+  });
+
   describe("show_blast_radius tool", () => {
     it("returns affected files from dependency graph", async () => {
       // Write a map.json with a dependency graph

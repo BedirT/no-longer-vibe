@@ -311,10 +311,12 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsReadForFlag = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: "flagged",
         read_at: new Date().toISOString(),
         note: args.reason,
+        exports_read: existingExportsReadForFlag,
       };
 
       recomputeStats(progress);
@@ -494,7 +496,6 @@ export function createStandaloneMcpServer(
       }
 
       // Find current layer (first layer with unread files)
-      const layers = map.reading_order.map((e) => e.layer);
       let currentLayer: string | null = null;
       let currentLayerTotal = 0;
       let currentLayerRead = 0;
