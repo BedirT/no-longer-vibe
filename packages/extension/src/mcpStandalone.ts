@@ -274,11 +274,14 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsRead = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: "confirmed",
         read_at: new Date().toISOString(),
+        exports_read: existingExportsRead,
       };
 
+      cascadeConfirmedToExports(progress, args.path, root);
       recomputeStats(progress);
       writeProgressJson(root, progress);
 
@@ -597,6 +600,9 @@ export function createStandaloneMcpServer(
         summary: args.summary,
       };
 
+      if (args.status === "confirmed") {
+        cascadeConfirmedToExports(progress, args.path, root);
+      }
       recomputeStats(progress);
       writeProgressJson(root, progress);
 
@@ -782,6 +788,37 @@ function callFailedError(tool: string) {
       },
     ],
   };
+}
+
+/**
+ * When a file is marked "confirmed", cascades that status to all
+ * exports that have no existing entry in exports_read.
+ * Requires map.json to look up the file's exports.
+ */
+function cascadeConfirmedToExports(
+  progress: ProgressJson,
+  filePath: string,
+  workspaceRoot: string,
+): void {
+  const map = readMapJson(workspaceRoot);
+  if (!map) return;
+
+  const entry = map.reading_order.find((e) => e.path === filePath);
+  if (!entry || entry.exports.length === 0) return;
+
+  const fileEntry = progress.files[filePath];
+  if (!fileEntry) return;
+
+  if (!fileEntry.exports_read) {
+    fileEntry.exports_read = {};
+  }
+
+  const now = new Date().toISOString();
+  for (const exportName of entry.exports) {
+    if (!fileEntry.exports_read[exportName]) {
+      fileEntry.exports_read[exportName] = { read_at: now };
+    }
+  }
 }
 
 function recomputeStats(progress: ProgressJson): void {

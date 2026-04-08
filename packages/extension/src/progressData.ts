@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { getMapData } from "./mapData";
 
 /** Reading status for a single file in progress.json. */
 export interface ProgressFileEntry {
@@ -180,12 +181,33 @@ export async function updateFileStatus(
   }
 
   const now = new Date().toISOString();
+  const existingExportsRead = currentProgress.files[relativePath]?.exports_read;
   currentProgress.files[relativePath] = {
     status,
     read_at: now,
     note: currentProgress.files[relativePath]?.note ?? null,
     summary: currentProgress.files[relativePath]?.summary ?? null,
+    exports_read: existingExportsRead,
   };
+
+  // Cascade confirmed status to unmarked exports
+  if (status === "confirmed") {
+    const map = getMapData();
+    if (map) {
+      const entry = map.reading_order.find((e) => e.path === relativePath);
+      if (entry && entry.exports.length > 0) {
+        const fileEntry = currentProgress.files[relativePath];
+        if (!fileEntry.exports_read) {
+          fileEntry.exports_read = {};
+        }
+        for (const exportName of entry.exports) {
+          if (!fileEntry.exports_read[exportName]) {
+            fileEntry.exports_read[exportName] = { read_at: now };
+          }
+        }
+      }
+    }
+  }
 
   // Recompute stats
   const files = currentProgress.files;
