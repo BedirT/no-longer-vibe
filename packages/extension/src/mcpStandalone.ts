@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getSocketPath } from "./ipcProtocol";
 import { IpcBridgeClient } from "./ipcClient";
+import { cascadeExportsForConfirmed } from "./cascadeExports";
 
 // --- Types (duplicated from types.ts to avoid pulling in vscode deps) ---
 
@@ -593,11 +594,13 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsReadForComplete = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: args.status,
         read_at: new Date().toISOString(),
         note: args.note,
         summary: args.summary,
+        exports_read: existingExportsReadForComplete,
       };
 
       if (args.status === "confirmed") {
@@ -793,7 +796,7 @@ function callFailedError(tool: string) {
 /**
  * When a file is marked "confirmed", cascades that status to all
  * exports that have no existing entry in exports_read.
- * Requires map.json to look up the file's exports.
+ * Reads map.json to look up the file's exports.
  */
 function cascadeConfirmedToExports(
   progress: ProgressJson,
@@ -809,16 +812,7 @@ function cascadeConfirmedToExports(
   const fileEntry = progress.files[filePath];
   if (!fileEntry) return;
 
-  if (!fileEntry.exports_read) {
-    fileEntry.exports_read = {};
-  }
-
-  const now = new Date().toISOString();
-  for (const exportName of entry.exports) {
-    if (!fileEntry.exports_read[exportName]) {
-      fileEntry.exports_read[exportName] = { read_at: now };
-    }
-  }
+  cascadeExportsForConfirmed(fileEntry, entry.exports, new Date().toISOString());
 }
 
 function recomputeStats(progress: ProgressJson): void {

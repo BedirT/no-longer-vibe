@@ -428,6 +428,48 @@ describe("mcpStandalone", () => {
       expect(entry.exports_read["DEFAULT_CONFIG"]).toBeDefined();
     });
 
+    it("complete_file with confirmed preserves pre-existing exports_read", async () => {
+      writeMapWithExports(tmpDir);
+
+      // Pre-populate with an existing export read with summary
+      const progressPath = path.join(guideDir, "progress.json");
+      const initial = {
+        version: "1.0.0",
+        files: {
+          "src/config.ts": {
+            status: "unread",
+            read_at: "",
+            exports_read: {
+              AppConfig: {
+                read_at: "2026-04-01T00:00:00Z",
+                summary: "App configuration type",
+              },
+            },
+          },
+        },
+        stats: { total: 2, confirmed: 0, flagged: 0, skimmed: 0, unread: 2 },
+      };
+      fs.writeFileSync(progressPath, JSON.stringify(initial));
+
+      const mod = await import("../src/mcpStandalone");
+      const server = mod.createStandaloneMcpServer(tmpDir);
+      await callTool(server, "complete_file", {
+        path: "src/config.ts",
+        status: "confirmed",
+        summary: "Config with env overrides",
+      });
+
+      const progress = JSON.parse(fs.readFileSync(progressPath, "utf-8"));
+      const entry = progress.files["src/config.ts"];
+
+      // Existing entry preserved
+      expect(entry.exports_read["AppConfig"].read_at).toBe("2026-04-01T00:00:00Z");
+      expect(entry.exports_read["AppConfig"].summary).toBe("App configuration type");
+      // New entries cascaded
+      expect(entry.exports_read["getConfig"]).toBeDefined();
+      expect(entry.exports_read["DEFAULT_CONFIG"]).toBeDefined();
+    });
+
     it("complete_file with flagged status does NOT cascade exports", async () => {
       writeMapWithExports(tmpDir);
 

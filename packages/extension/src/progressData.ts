@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { getMapData } from "./mapData";
+import { cascadeExportsForConfirmed } from "./cascadeExports";
 
 /** Reading status for a single file in progress.json. */
 export interface ProgressFileEntry {
@@ -196,15 +197,11 @@ export async function updateFileStatus(
     if (map) {
       const entry = map.reading_order.find((e) => e.path === relativePath);
       if (entry && entry.exports.length > 0) {
-        const fileEntry = currentProgress.files[relativePath];
-        if (!fileEntry.exports_read) {
-          fileEntry.exports_read = {};
-        }
-        for (const exportName of entry.exports) {
-          if (!fileEntry.exports_read[exportName]) {
-            fileEntry.exports_read[exportName] = { read_at: now };
-          }
-        }
+        cascadeExportsForConfirmed(
+          currentProgress.files[relativePath],
+          entry.exports,
+          now,
+        );
       }
     }
   }
