@@ -1,9 +1,9 @@
 {
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
-  "last_session": "2026-04-07",
+  "last_session": "2026-04-08",
   "current_milestone": "Phase 1: Core — COMPLETE",
-  "current_issue": "BED-97",
+  "current_issue": "BED-147",
   "features": [
     {
       "issue": "BED-60",
@@ -124,8 +124,20 @@
       "title": "Extension progress.json filesystem watcher",
       "status": "pr-merged",
       "pr": "https://github.com/BedirT/no-longer-vibe/pull/48"
+    },
+    {
+      "issue": "BED-151",
+      "title": "MCP tools visual execution fix",
+      "status": "pr-merged",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/66"
+    },
+    {
+      "issue": "BED-147",
+      "title": "Cascade confirmed status to unmarked sub-functions",
+      "status": "in-progress",
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/67"
     }
   ],
   "blockers": [],
-  "next_action": "BED-97 PR pending. Remaining backlog: BED-147."
+  "next_action": "BED-147 PR pending review."
 }

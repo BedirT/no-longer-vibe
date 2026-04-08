@@ -18,6 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { getSocketPath } from "./ipcProtocol";
 import { IpcBridgeClient } from "./ipcClient";
+import { cascadeExportsForConfirmed } from "./cascadeExports";
 
 // --- Types (duplicated from types.ts to avoid pulling in vscode deps) ---
 
@@ -274,11 +275,14 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsRead = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: "confirmed",
         read_at: new Date().toISOString(),
+        exports_read: existingExportsRead,
       };
 
+      cascadeConfirmedToExports(progress, args.path, root);
       recomputeStats(progress);
       writeProgressJson(root, progress);
 
@@ -307,10 +311,12 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsReadForFlag = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: "flagged",
         read_at: new Date().toISOString(),
         note: args.reason,
+        exports_read: existingExportsReadForFlag,
       };
 
       recomputeStats(progress);
@@ -490,7 +496,6 @@ export function createStandaloneMcpServer(
       }
 
       // Find current layer (first layer with unread files)
-      const layers = map.reading_order.map((e) => e.layer);
       let currentLayer: string | null = null;
       let currentLayerTotal = 0;
       let currentLayerRead = 0;
@@ -590,13 +595,18 @@ export function createStandaloneMcpServer(
         stats: { total: 0, confirmed: 0, flagged: 0, skimmed: 0, unread: 0 },
       };
 
+      const existingExportsReadForComplete = progress.files[args.path]?.exports_read;
       progress.files[args.path] = {
         status: args.status,
         read_at: new Date().toISOString(),
         note: args.note,
         summary: args.summary,
+        exports_read: existingExportsReadForComplete,
       };
 
+      if (args.status === "confirmed") {
+        cascadeConfirmedToExports(progress, args.path, root);
+      }
       recomputeStats(progress);
       writeProgressJson(root, progress);
 
@@ -782,6 +792,28 @@ function callFailedError(tool: string) {
       },
     ],
   };
+}
+
+/**
+ * When a file is marked "confirmed", cascades that status to all
+ * exports that have no existing entry in exports_read.
+ * Reads map.json to look up the file's exports.
+ */
+function cascadeConfirmedToExports(
+  progress: ProgressJson,
+  filePath: string,
+  workspaceRoot: string,
+): void {
+  const map = readMapJson(workspaceRoot);
+  if (!map) return;
+
+  const entry = map.reading_order.find((e) => e.path === filePath);
+  if (!entry || entry.exports.length === 0) return;
+
+  const fileEntry = progress.files[filePath];
+  if (!fileEntry) return;
+
+  cascadeExportsForConfirmed(fileEntry, entry.exports, new Date().toISOString());
 }
 
 function recomputeStats(progress: ProgressJson): void {
