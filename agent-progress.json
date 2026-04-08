@@ -1,7 +1,7 @@
 {
   "project": "no-longer-vibe",
   "linear_project": "No Longer Vibe",
-  "last_session": "2026-04-07",
+  "last_session": "2026-04-08",
   "current_milestone": "Phase 1: Core — COMPLETE",
   "current_issue": "BED-147",
   "features": [
@@ -135,7 +135,7 @@
       "issue": "BED-147",
       "title": "Cascade confirmed status to unmarked sub-functions",
       "status": "in-progress",
-      "pr": null
+      "pr": "https://github.com/BedirT/no-longer-vibe/pull/67"
     }
   ],
   "blockers": [],

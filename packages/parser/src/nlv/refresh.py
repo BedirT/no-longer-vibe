@@ -301,11 +301,14 @@ def refresh_progress(
             "Pruned %d file(s) not in reading_order", len(pruned_paths),
         )
 
-    # 6. Update map_hash and recompute stats
+    # 6. Reset pointer — files may have been invalidated before it
+    old_data["next_unread_index"] = 0
+
+    # 7. Update map_hash and recompute stats
     old_data["map_hash"] = new_map_hash
     old_data["stats"] = mgr.compute_stats()
 
-    # 7. Save atomically
+    # 8. Save atomically
     mgr.save()
 
     return RefreshResult(
@@ -532,7 +535,10 @@ def refresh_progress_from_git(
     files = data["files"]
     invalidated_count = _apply_diff_to_progress(files, diff, dep_graph)
 
-    # 11. Update stats and git state
+    # 11. Reset pointer — files may have been invalidated before it
+    data["next_unread_index"] = 0
+
+    # 12. Update stats and git state
     data["stats"] = mgr.compute_stats()
     current_branch = get_current_branch(repo_root)
     mgr.set_git_state(current_commit, current_branch)

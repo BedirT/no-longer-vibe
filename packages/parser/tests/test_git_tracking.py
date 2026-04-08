@@ -594,3 +594,39 @@ class TestFilterGuideDirEntries:
         guide = tmp_path / ".codebase-guide"
         result = _filter_guide_dir_entries([], guide, tmp_path)
         assert result == []
+
+
+class TestRefreshFromGitResetsPointer:
+    """Git-based refresh resets next_unread_index (BED-97)."""
+
+    def test_pointer_reset_to_zero_after_git_refresh(
+        self, git_repo: Path,
+    ) -> None:
+        """After git-based refresh invalidates files, pointer resets."""
+        guide_dir = git_repo / ".codebase-guide"
+        commit = get_head_commit(git_repo)
+        assert commit is not None
+
+        files = ["a.py", "b.py"]
+        map_data = _make_map_data(files)
+        _setup_progress(
+            guide_dir, map_data,
+            git_commit=commit, git_branch="main",
+            confirmed=["a.py", "b.py"],
+        )
+
+        # Advance pointer past both files
+        mgr = ProgressManager(guide_dir)
+        mgr.advance_pointer(files)
+        data = mgr.load()
+        assert data["next_unread_index"] == 2
+
+        # Modify a.py and commit
+        (git_repo / "a.py").write_text("# modified\n")
+        _git_commit(git_repo, "modify a.py")
+
+        result = refresh_progress_from_git(guide_dir, git_repo)
+        assert result is not None
+
+        data = mgr.load()
+        assert data["next_unread_index"] == 0

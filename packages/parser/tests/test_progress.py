@@ -554,3 +554,106 @@ class TestEdgeCases:
         assert FileStatus.FLAGGED.value == "flagged"
         assert FileStatus.SKIMMED.value == "skimmed"
         assert FileStatus.UNREAD.value == "unread"
+
+
+class TestNextUnreadPointer:
+    """next_unread_index pointer in progress.json (BED-97)."""
+
+    def test_create_initializes_pointer_to_zero(self, tmp_path: Path) -> None:
+        """New progress.json has next_unread_index set to 0."""
+        guide_dir = tmp_path / ".codebase-guide"
+        map_data = _make_map_data(["a.py", "b.py"])
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        data = mgr.load()
+
+        assert data["next_unread_index"] == 0
+
+    def test_advance_pointer_finds_next_unread(self, tmp_path: Path) -> None:
+        """After marking first file, pointer advances to index 1."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py", "c.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        mgr.update_file("a.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.advance_pointer(files)
+        data = mgr.load()
+
+        assert data["next_unread_index"] == 1
+
+    def test_advance_pointer_skips_multiple_read(self, tmp_path: Path) -> None:
+        """Pointer skips over confirmed and flagged files."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py", "c.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        mgr.update_file("a.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.update_file("b.py", status=FileStatus.FLAGGED, note="Check.")
+        mgr.advance_pointer(files)
+        data = mgr.load()
+
+        assert data["next_unread_index"] == 2
+
+    def test_advance_pointer_at_end_when_all_read(self, tmp_path: Path) -> None:
+        """When all files are read, pointer equals len(files)."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+        mgr.update_file("a.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.update_file("b.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr.advance_pointer(files)
+        data = mgr.load()
+
+        assert data["next_unread_index"] == 2
+
+    def test_advance_pointer_persists_to_disk(self, tmp_path: Path) -> None:
+        """Pointer survives a fresh ProgressManager instance."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py", "c.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr1 = ProgressManager(guide_dir)
+        mgr1.create(map_data, map_hash)
+        mgr1.update_file("a.py", status=FileStatus.CONFIRMED, summary="Done.")
+        mgr1.advance_pointer(files)
+
+        mgr2 = ProgressManager(guide_dir)
+        data = mgr2.load()
+        assert data["next_unread_index"] == 1
+
+    def test_legacy_progress_defaults_pointer_to_zero(
+        self, tmp_path: Path,
+    ) -> None:
+        """Progress files without next_unread_index default to 0."""
+        guide_dir = tmp_path / ".codebase-guide"
+        files = ["a.py", "b.py"]
+        map_data = _make_map_data(files)
+        map_hash = _write_map(guide_dir, map_data)
+
+        mgr = ProgressManager(guide_dir)
+        mgr.create(map_data, map_hash)
+
+        # Remove field to simulate legacy progress
+        data = mgr.load()
+        del data["next_unread_index"]
+        raw = json.dumps(data, indent=2) + "\n"
+        (guide_dir / "progress.json").write_text(raw)
+
+        mgr2 = ProgressManager(guide_dir)
+        mgr2.load()
+        mgr2.advance_pointer(files)
+        data2 = mgr2.load()
+        assert data2["next_unread_index"] == 0
